@@ -1,4 +1,4 @@
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QVariant, QgsField
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QVariant
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 from .resources import *
@@ -11,6 +11,7 @@ from qgis.core import *
 from qgis.core import QgsField, QgsMapLayer, QgsWkbTypes, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsGeometry, QgsPoint, QgsFeature
 from qgis.core import QgsAggregateCalculator, QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
 from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer, QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
+from qgis.core import QgsTask, QgsApplication
 from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -226,9 +227,9 @@ class Models:
     def run_model(self):
         model = self.dockwidget.model_comboBox.currentText()
         if model == "Гравитационная модель":
-            self.run_gravity_model()
+            self.run_gravity_model(self)
         elif model == "Модель центральных мест":
-            self.run_centers_model()
+            self.run_centers_model(self)
 
 
     def run_gravity_model(self):
@@ -258,6 +259,7 @@ class Models:
         for i in range(layer_tc.featureCount()):
             if layer.fields().indexFromName(f'tc_{i}') == -1: 
                 new_attrs.append(QgsField(f'tc_{i}', QVariant.Double))
+                
         if new_attrs:
             layer.dataProvider().addAttributes(new_attrs)
             layer.updateFields()
@@ -266,29 +268,10 @@ class Models:
         if layer_tc.fields().indexFromName('weight') == -1: 
             layer_tc.dataProvider().addAttributes([QgsField('weight', QVariant.Double)])
             layer_tc.updateFields()
-
-        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
-        layer.startEditing()
-        for f in list(layer.getFeatures()):
-            # print(f.id())
-            h_list = []
-            for tc in layer_tc.getFeatures():
-                h = tc[layer_tc_attr]**alpha / f.geometry().distance(tc.geometry())**beta
-                h_list.append(h)
-            total_h = sum(h_list)
-            vers = [round(h / total_h, 2) for h in h_list]
-            for i in range(len(vers)):
-                f[f'tc_{i}'] = round(vers[i] * float(f[layer_attr]), 2)
-            layer.updateFeature(f)
-        layer.commitChanges()
-
-        # на основе предыдущих рассчетов считаем вес для каждого поставщика
-        layer_tc.startEditing()
-        for tc in layer_tc.getFeatures():
-            result = layer.aggregate(QgsAggregateCalculator.Sum, f'tc_{tc.id() - 1}')[0] # в исходном tc нумерация id от 0, а в новом от 1
-            tc['weight'] = int(result)
-            layer_tc.updateFeature(tc)
-        layer_tc.commitChanges()
+            
+        task = GravityModelTask(layer, layer_tc, layer_attr, layer_tc_attr, alpha, beta)
+        QgsApplication.taskManager().addTask(task)
+        task.waitForFinished()
 
         # задание стиля для слоя поставщиков
         graduated_size = QgsGraduatedSymbolRenderer('weight')
@@ -469,3 +452,58 @@ class Models:
         print(execution_time)
 
         self.dlg_model.close()
+ 
+        
+class GravityModelTask(QgsTask):
+    def __init__(self, layer, layer_tc, layer_attr, layer_tc_attr, alpha, beta, parent=None):
+        super().__init__("Gravity Model Task")
+        self.parent = parent
+        self.layer = layer
+        self.layer_tc = layer_tc
+        self.layer_attr = layer_attr
+        self.layer_tc_attr = layer_tc_attr
+        self.alpha = alpha
+        self.beta = beta
+        
+    def run(self):
+        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
+        self.layer.startEditing()        
+        for f in list(self.layer.getFeatures()):
+            h_list = []
+            for tc in self.layer_tc.getFeatures():
+                h = float(tc[self.layer_tc_attr])**self.alpha / f.geometry().distance(tc.geometry())**self.beta
+                h_list.append(h)
+                
+            total_h = sum(h_list)
+            vers = [round(h / total_h, 2) for h in h_list]
+            for i in range(len(vers)):
+                f[f'tc_{i}'] = round(vers[i] * float(f[self.layer_attr]), 2)
+            self.layer.updateFeature(f)
+            
+        self.layer.commitChanges()
+        
+        # на основе предыдущих рассчетов считаем вес для каждого поставщика
+        self.layer_tc.startEditing()
+        for tc in self.layer_tc.getFeatures():
+            result = self.layer.aggregate(QgsAggregateCalculator.Sum, f'tc_{tc.id() - 1}')[0] # в исходном tc нумерация id от 0, а в новом от 1
+            tc['weight'] = int(result)
+            self.layer_tc.updateFeature(tc)
+            
+        self.layer_tc.commitChanges()
+
+
+class CentersModelTask(QgsTask):
+    def __init__(self, parent=None):
+        super().__init__("Centers Model Task")
+        self.parent = parent
+
+    def run(self):
+        # Perform heavy work for the centers model here
+        # Example heavy work:
+        for i in range(100):
+            # Simulate heavy work progress
+            QgsApplication.processEvents()
+            if self.isCanceled():
+                return False
+            # Your heavy work code goes here
+        return True
