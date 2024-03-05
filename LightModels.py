@@ -83,7 +83,6 @@ class GravityModelWorker(QThread):
         # QgsApplication.taskManager().addTask(task)
         # task.waitForFinished()
 
-        print('6')
         # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
         layer.startEditing()        
         for f in list(layer.getFeatures()):
@@ -100,7 +99,6 @@ class GravityModelWorker(QThread):
 
         layer.commitChanges()
 
-        print('7')
         # на основе предыдущих рассчетов считаем вес для каждого поставщика
         layer_tc.startEditing()
         for tc in layer_tc.getFeatures():
@@ -110,7 +108,6 @@ class GravityModelWorker(QThread):
 
         layer_tc.commitChanges()
 
-        print('8')
         # задание стиля для слоя поставщиков
         graduated_size = QgsGraduatedSymbolRenderer('weight')
         graduated_size.updateClasses(layer_tc, QgsGraduatedSymbolRenderer.EqualInterval, layer_tc.featureCount())
@@ -120,7 +117,6 @@ class GravityModelWorker(QThread):
         layer_tc.setRenderer(graduated_size)
         layer_tc.triggerRepaint()
 
-        print('9')
         # добавляем созданную группу в проект
         root = QgsProject.instance().layerTreeRoot()
         root.insertChildNode(0, group)
@@ -142,7 +138,6 @@ class CentersModelWorker(QThread):
         self.stopworker = True
         
     def run(self):
-        print('1')
         # получаем данные из формы
         start_time = time.time()
         layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
@@ -212,7 +207,7 @@ class CentersModelWorker(QThread):
         group = QgsLayerTreeGroup('Модель центральных мест')
 
         centers = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression('@id = "to"')))
-        print('2')
+
         with ThreadPoolExecutor() as executor:
             futures = [executor.submit(process_center, center) for center in centers]
 
@@ -247,7 +242,6 @@ class CentersModelWorker(QThread):
                 f.setAttributes(a + [centers[i].id()])
                 line_data.addFeatures([f])
 
-        print('3')
         # добавляем слои в проект
         QgsProject.instance().addMapLayer(point_layer, False)
         QgsProject.instance().addMapLayer(line_layer, False)
@@ -259,7 +253,6 @@ class CentersModelWorker(QThread):
         centers_layer.updateFields()
         prov.addFeatures(centers)
 
-        print('4')
         # задание стиля слою центров
         symbol = QgsMarkerSymbol.createSimple({'name': 'circle', 'color': 'orange'})
         symbol.setSize(5)
@@ -293,17 +286,14 @@ class CentersModelWorker(QThread):
         line_layer.setRenderer(renderer)
         line_layer.triggerRepaint()
 
-        print('5')
         # добавлям слои в группу
         group.insertChildNode(0, QgsLayerTreeLayer(centers_layer))
         group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(point_layer))
         group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(line_layer))
 
-        print('6')
         # добавляем созданную группу в проект
         root = QgsProject.instance().layerTreeRoot()
         root.insertChildNode(0, group)
-        print('7')
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -338,6 +328,10 @@ class Models:
         # TODO: We are going to let the user set this up in a future iteration
         self.toolbar = self.iface.addToolBar(u'Models')
         self.toolbar.setObjectName(u'Models')
+        
+        # QThread attributes
+        self.thread = None
+        self.worker = None
 
         # print "** INITIALIZING Models"
 
@@ -346,16 +340,6 @@ class Models:
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
-        """Get the translation for a string using Qt translation API.
-
-        We implement this ourselves since we do not inherit QObject.
-
-        :param message: String for translation.
-        :type message: str, QString
-
-        :returns: Translated version of message.
-        :rtype: QString
-        """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('Models', message)
 
@@ -370,44 +354,7 @@ class Models:
             status_tip=None,
             whats_this=None,
             parent=None):
-        """Add a toolbar icon to the toolbar.
-
-        :param icon_path: Path to the icon for this action. Can be a resource
-            path (e.g. ':/plugins/foo/bar.png') or a normal file system path.
-        :type icon_path: str
-
-        :param text: Text that should be shown in menu items for this action.
-        :type text: str
-
-        :param callback: Function to be called when the action is triggered.
-        :type callback: function
-
-        :param enabled_flag: A flag indicating if the action should be enabled
-            by default. Defaults to True.
-        :type enabled_flag: bool
-
-        :param add_to_menu: Flag indicating whether the action should also
-            be added to the menu. Defaults to True.
-        :type add_to_menu: bool
-
-        :param add_to_toolbar: Flag indicating whether the action should also
-            be added to the toolbar. Defaults to True.
-        :type add_to_toolbar: bool
-
-        :param status_tip: Optional text to show in a popup when mouse pointer
-            hovers over the action.
-        :type status_tip: str
-
-        :param parent: Parent widget for the new action. Defaults None.
-        :type parent: QWidget
-
-        :param whats_this: Optional text to show in the status bar when the
-            mouse pointer hovers over the action.
-
-        :returns: The action that was created. Note that the action is also
-            added to self.actions list.
-        :rtype: QAction
-        """
+        
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
@@ -437,8 +384,8 @@ class Models:
     # --------------------------------------------------------------------------
 
     # закрытие плагина
-    def onClosePlugin(self):
-        self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
+    def on_close_plugin(self):
+        self.dockwidget.closingPlugin.disconnect(self.on_close_plugin)
         self.dockwidget.model_comboBox.clear()
         # self.dockwidget.message_label.clear()
         # self.dockwidget.ok_button.setEnabled(True)
@@ -457,11 +404,10 @@ class Models:
         del self.toolbar
 
 
-    def startGravityModelWorker(self): # method to start the worker thread
+    def start_gravity_model_worker(self):
         self.thread = QThread()
         self.worker = GravityModelWorker(dlg_model=self.dlg_model)
-        # see https://realpython.com/python-pyqt-qthread/#using-qthread-to-prevent-freezing-guis
-        # and https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html
+        
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
@@ -469,59 +415,37 @@ class Models:
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         # self.worker.progress.connect(self.reportProgress)
-        self.thread.start() # finally start the thread
-        self.dockwidget.ok_button.setEnabled(False) # disable the start-thread button while thread is running
-        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True)) # enable the start-thread button when thread has been finished
+        self.thread.start()
+        self.dockwidget.ok_button.setEnabled(False) # disable the OK button while thread is running
+        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
 
 
-    def killGravityModelWorker(self): # method to kill/cancel the worker thread
-        self.worker.stop() # call the stop method in worker class
-        # print('pushed cancel') # debugging
-        # see https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html
-        try: # to prevent a Python error when the cancel button has been clicked but no thread is running use try/except
-            if self.thread.isRunning(): # check if a thread is running
-                # print('pushed cancel, thread is running, trying to cancel') # debugging
-                #self.thread.requestInterruption() # not sure how to actually use it as there are no examples to find anywhere, one somehow would need to listen to isInterruptionRequested()
-                self.thread.exit() # Tells the thread’s event loop to exit with a return code.
-                self.thread.quit() # Tells the thread’s event loop to exit with return code 0 (success). Equivalent to calling exit (0).
-                self.thread.wait() # Blocks the thread until https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html#PySide6.QtCore.PySide6.QtCore.QThread.wait
-        except:
-            # print('kill worker - task does no longer exist') # debugging 
-            pass
-        
-        
-    def startCentersModelWorker(self): # method to start the worker thread
+    def start_centers_model_worker(self):
         self.thread = QThread()
         self.worker = CentersModelWorker(dlg_model=self.dlg_model)
-        # see https://realpython.com/python-pyqt-qthread/#using-qthread-to-prevent-freezing-guis
-        # and https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html
+        
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.worker.progress.connect(self.reportProgress)
-        self.thread.start() # finally start the thread
-        self.dockwidget.ok_button.setEnabled(False) # disable the start-thread button while thread is running
-        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True)) # enable the start-thread button when thread has been finished
+
+        self.thread.start()
+        # disable / enable buttons
+        self.dockwidget.ok_button.setEnabled(False)
+        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
 
 
-    def killCentersModelWorker(self): # method to kill/cancel the worker thread
-        self.worker.stop() # call the stop method in worker class
-        # print('pushed cancel') # debugging
-        # see https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html
+    def kill_current_model_worker(self): # method to kill/cancel the worker thread
+        self.worker.stop()
+        
         try: # to prevent a Python error when the cancel button has been clicked but no thread is running use try/except
-            if self.thread.isRunning(): # check if a thread is running
-                # print('pushed cancel, thread is running, trying to cancel') # debugging
-                #self.thread.requestInterruption() # not sure how to actually use it as there are no examples to find anywhere, one somehow would need to listen to isInterruptionRequested()
-                self.thread.exit() # Tells the thread’s event loop to exit with a return code.
-                self.thread.quit() # Tells the thread’s event loop to exit with return code 0 (success). Equivalent to calling exit (0).
-                self.thread.wait() # Blocks the thread until https://doc.qt.io/qtforpython/PySide6/QtCore/QThread.html#PySide6.QtCore.PySide6.QtCore.QThread.wait
+            if self.thread.isRunning():
+                self.thread.quit()
         except:
-            # print('kill worker - task does no longer exist') # debugging 
             pass
-
+        
 
     # --------------------------------------------------------------------------
 
@@ -533,25 +457,26 @@ class Models:
             self.pluginIsActive = True
             if self.dockwidget == None:
                 self.dockwidget = ModelsDockWidget()
-            self.dockwidget.closingPlugin.connect(self.onClosePlugin)
+            self.dockwidget.closingPlugin.connect(self.on_close_plugin)
             self.dockwidget.dockWidgetContents.setEnabled(True)
             self.iface.addDockWidget(Qt.TopDockWidgetArea, self.dockwidget)
             self.dockwidget.show()
             
             for model_name in ['Гравитационная модель', 'Модель центральных мест', 'Модель 3']:
                 self.dockwidget.model_comboBox.addItem(model_name)
+                
             self.dockwidget.ok_button.clicked.connect(self.run_model_dialog)     
             
 
-    def on_layer_combobox_changed(self, layer_cmb, attrs_cmb):
+    def on_layer_combobox_changed_do_show_layer_attrs(self, layer_cmb, attrs_cmb):
         layer = layer_cmb.itemData(layer_cmb.currentIndex())
         attributes = [field.name() for field in layer.fields()]
         attrs_cmb.clear()
         attrs_cmb.addItems(attributes)
     
 
-    def onCloseDialog(self):
-        self.killGravityModelWorker()
+    def on_close_model_dialog(self):
+        self.kill_current_model_worker()
         self.dockwidget.close()
 
 
@@ -566,7 +491,7 @@ class Models:
                 if (layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry):
                     self.dlg_model.comboBox_feature_layer.addItem(layer.name(), layer)
             self.dlg_model.comboBox_feature_layer.setCurrentIndex(-1)
-            self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
+            self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
         
         elif model == "Гравитационная модель":
             self.dlg_model = GravityDialog()
@@ -576,11 +501,11 @@ class Models:
                     self.dlg_model.comboBox_feature_layer_2.addItem(layer.name(), layer)
             self.dlg_model.comboBox_feature_layer.setCurrentIndex(-1)
             self.dlg_model.comboBox_feature_layer_2.setCurrentIndex(-1)
-            self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
-            self.dlg_model.comboBox_feature_layer_2.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed(self.dlg_model.comboBox_feature_layer_2, self.dlg_model.comboBox_significance_attr_2))
+            self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
+            self.dlg_model.comboBox_feature_layer_2.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer_2, self.dlg_model.comboBox_significance_attr_2))
         
         if not self.dlg_model is None:
-            self.dlg_model.closingDialog.connect(self.onCloseDialog)
+            self.dlg_model.closingDialog.connect(self.on_close_model_dialog)
             self.dlg_model.ok_button.clicked.connect(self.run_model)
             self.dlg_model.show()
         else:
@@ -590,9 +515,9 @@ class Models:
     def run_model(self):
         model = self.dockwidget.model_comboBox.currentText()
         if model == "Гравитационная модель":
-            self.startGravityModelWorker()
+            self.start_gravity_model_worker()
         elif model == "Модель центральных мест":
-            self.startCentersModelWorker()
+            self.start_centers_model_worker()
 
 
     def run_gravity_model(self):
