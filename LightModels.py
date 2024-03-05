@@ -17,6 +17,9 @@ from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import time
+from _struct import *
+
+
 
 class GravityModelWorker(QThread):
     finished = pyqtSignal() # pyqtSignal for when task is finished
@@ -31,15 +34,12 @@ class GravityModelWorker(QThread):
     def stop(self):
         self.stopworker = True
         self.dlg_model.close()
-        
+
     def run(self):
         self.progress.emit(0) # reset progressbar
         print('grav model run')
-
+        
         #     self.progress.emit(int((i+1)/self.total*100)) # report the current progress via pyqt signal to reportProgress method of TaskTest-Class
-        #     if self.stopworker == True: # if cancel button has been pressed the stop method is called and stopworker set to True. If so, break the loop so the thread can be stopped
-        #         print('break req')
-        #         break
 
         # получение данных из формы
         layer_attr = self.dlg_model.comboBox_significance_attr.currentText()
@@ -62,27 +62,26 @@ class GravityModelWorker(QThread):
         group = QgsLayerTreeGroup('Гравитационная модель')
         group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
 
-        # в слое потребителей создаем поля для записи информации о том, сколько людей пойдет к конкретному поставщику 
-        new_attrs = []
-        for i in range(layer_tc.featureCount()):
-            if layer.fields().indexFromName(f'tc_{i}') == -1: 
-                new_attrs.append(QgsField(f'tc_{i}', QVariant.Double))
 
-        if new_attrs:
-            layer.dataProvider().addAttributes(new_attrs)
-            layer.updateFields()
+        # new_attrs = []
+        # for i in range(layer_tc.featureCount()):
+        #     if layer.fields().indexFromName(f'tc_{i}') == -1: 
+        #         new_attrs.append(QgsField(f'tc_{i}', QVariant.Double))
 
-        # добавляем поле 'weight'
-        if layer_tc.fields().indexFromName('weight') == -1: 
-            layer_tc.dataProvider().addAttributes([QgsField('weight', QVariant.Double)])
-            layer_tc.updateFields()
+        # if new_attrs:
+        #     layer.dataProvider().addAttributes(new_attrs)
+        #     layer.updateFields()
+        
 
-        # task = GravityModelTask(layer, layer_tc, layer_attr, layer_tc_attr, alpha, beta)
-        # QgsApplication.taskManager().addTask(task)
-        # task.waitForFinished()
+        # # добавляем поле 'weight'
+        # if layer_tc.fields().indexFromName('weight') == -1: 
+        #     layer_tc.dataProvider().addAttributes([QgsField('weight', QVariant.Double)])
+        #     layer_tc.updateFields()
 
-        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
-        layer.startEditing()        
+        # Словарь для записи информации о том, сколько людей пойдет к конкретному поставщику 
+        trip_id_to_count_dict = { }
+        
+        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля   
         for f in list(layer.getFeatures()):
             h_list = []
             for tc in layer_tc.getFeatures():
@@ -92,12 +91,10 @@ class GravityModelWorker(QThread):
             total_h = sum(h_list)
             vers = [round(h / total_h, 2) for h in h_list]
             for i in range(len(vers)):
-                f[f'tc_{i}'] = round(vers[i] * float(f[layer_attr]), 2)
-            layer.updateFeature(f)
-
-        layer.commitChanges()
+                trip_id_to_count_dict[f'trips_count_{i}'] = round(vers[i] * float(f[layer_attr]) , 2)
 
         # на основе предыдущих рассчетов считаем вес для каждого поставщика
+        # походу weight это сумма trip_id_to_count_dict
         layer_tc.startEditing()
         for tc in layer_tc.getFeatures():
             result = layer.aggregate(QgsAggregateCalculator.Sum, f'tc_{tc.id() - 1}')[0] # в исходном tc нумерация id от 0, а в новом от 1
@@ -135,7 +132,7 @@ class CentersModelWorker(QThread):
     def stop(self):
         self.stopworker = True
         self.dlg_model.close()
-        
+
     def run(self):
         # получаем данные из формы
         start_time = time.time()
@@ -547,7 +544,7 @@ class Models:
         group = QgsLayerTreeGroup('Гравитационная модель')
         group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
 
-        # в слое потребителей создаем поля для записи информации о том, сколько людей пойдет к конкретному поставщику 
+        # в слое потребителей создаем поля для записи информации о том, сколько людей пойдет к конкретному поставщику
         new_attrs = []
         for i in range(layer_tc.featureCount()):
             if layer.fields().indexFromName(f'tc_{i}') == -1: 
@@ -626,11 +623,11 @@ class Models:
 
         # ищет связанные точки для данной точки
         def get_connected_features(feature, layer):
-            features = []  
-            stack = [feature]  
+            features = []
+            stack = [feature]
             while stack:
-                current_feature = stack.pop() 
-                features.append(current_feature)  
+                current_feature = stack.pop()
+                features.append(current_feature)
                 connect_features = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression(f'"to" = {current_feature.id()} AND @id != {current_feature.id()}')))
                 stack.extend(connect_features)
             return features
