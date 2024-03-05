@@ -13,6 +13,16 @@
   <property name="windowTitle">
    <string>Гравитационная модель</string>
   </property>
+  <widget class="QProgressBar" name="progress_bar">
+   <property name="geometry">
+    <rect>
+     <x>130</x>
+     <y>270</y>
+     <width>300</width>
+     <height>18</height>
+    </rect>
+   </property>
+  </widget>
   <widget class="QLabel" name="label_significance_attr">
    <property name="geometry">
     <rect>

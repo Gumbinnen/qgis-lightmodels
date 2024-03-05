@@ -19,8 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 
 class GravityModelWorker(QThread):
-    finished = pyqtSignal() # create a pyqtSignal for when task is finished
-    progress = pyqtSignal(int) # create a pyqtSignal to report the progress to progressbar
+    finished = pyqtSignal() # pyqtSignal for when task is finished
+    progress = pyqtSignal(int) # pyqtSignal to report the progress to progressbar
 
     def __init__(self, dlg_model):
         super(QThread, self).__init__()
@@ -30,13 +30,11 @@ class GravityModelWorker(QThread):
             
     def stop(self):
         self.stopworker = True
+        self.dlg_model.close()
         
     def run(self):
-        # self.progress.emit(0) # reset progressbar
-        # self.time = 22 # just a variable to work with
-        # self.total = 10 # just a variable to work with
-        # # print('run') # debug: we just entered the run method of Worker-Class
-        # for i in range(self.total): # just do something
+        self.progress.emit(0) # reset progressbar
+        print('grav model run')
 
         #     self.progress.emit(int((i+1)/self.total*100)) # report the current progress via pyqt signal to reportProgress method of TaskTest-Class
         #     if self.stopworker == True: # if cancel button has been pressed the stop method is called and stopworker set to True. If so, break the loop so the thread can be stopped
@@ -125,8 +123,8 @@ class GravityModelWorker(QThread):
         
        
 class CentersModelWorker(QThread):
-    finished = pyqtSignal() # create a pyqtSignal for when task is finished
-    progress = pyqtSignal(int) # create a pyqtSignal to report the progress to progressbar
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
 
     def __init__(self, dlg_model):
         super(QThread, self).__init__()
@@ -136,6 +134,7 @@ class CentersModelWorker(QThread):
         
     def stop(self):
         self.stopworker = True
+        self.dlg_model.close()
         
     def run(self):
         # получаем данные из формы
@@ -303,6 +302,7 @@ class CentersModelWorker(QThread):
         
         self.finished = True
 
+
 # реализация плагина
 class Models:
     def __init__(self, iface):
@@ -338,7 +338,7 @@ class Models:
         self.pluginIsActive = False
         self.dockwidget = None
 
-    # noinspection PyMethodMayBeStatic
+
     def tr(self, message):
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('Models', message)
@@ -393,6 +393,9 @@ class Models:
         self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)     
         print("plugin close")
 
+    def report_progress(self, n):
+        self.dlg_model.progress_bar.setValue(n) # set the current progress in progress bar
+        
 
     # удаление меню плагина и иконки с qgis интерфейса
     def unload(self):
@@ -414,7 +417,7 @@ class Models:
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        # self.worker.progress.connect(self.reportProgress)
+        self.worker.progress.connect(self.report_progress)
         self.thread.start()
         self.dockwidget.ok_button.setEnabled(False) # disable the OK button while thread is running
         self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
@@ -437,7 +440,7 @@ class Models:
         self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
 
 
-    def kill_current_model_worker(self): # method to kill/cancel the worker thread
+    def kill_current_model_worker(self):
         self.worker.stop()
         
         try: # to prevent a Python error when the cancel button has been clicked but no thread is running use try/except
@@ -488,7 +491,8 @@ class Models:
         if model == "Модель центральных мест":
             self.dlg_model = MyPluginDialog()
             for layer in iface.mapCanvas().layers():
-                if (layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry):
+                isLayerValid = (layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry)
+                if (isLayerValid):
                     self.dlg_model.comboBox_feature_layer.addItem(layer.name(), layer)
             self.dlg_model.comboBox_feature_layer.setCurrentIndex(-1)
             self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
@@ -496,14 +500,15 @@ class Models:
         elif model == "Гравитационная модель":
             self.dlg_model = GravityDialog()
             for layer in iface.mapCanvas().layers():
-                if (layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry):
+                isLayerValid = (layer.type() == QgsMapLayer.VectorLayer and layer.geometryType() == QgsWkbTypes.PointGeometry)
+                if (isLayerValid):
                     self.dlg_model.comboBox_feature_layer.addItem(layer.name(), layer)
                     self.dlg_model.comboBox_feature_layer_2.addItem(layer.name(), layer)
             self.dlg_model.comboBox_feature_layer.setCurrentIndex(-1)
             self.dlg_model.comboBox_feature_layer_2.setCurrentIndex(-1)
             self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
             self.dlg_model.comboBox_feature_layer_2.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed_do_show_layer_attrs(self.dlg_model.comboBox_feature_layer_2, self.dlg_model.comboBox_significance_attr_2))
-        
+
         if not self.dlg_model is None:
             self.dlg_model.closingDialog.connect(self.on_close_model_dialog)
             self.dlg_model.ok_button.clicked.connect(self.run_model)
