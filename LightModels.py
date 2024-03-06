@@ -17,6 +17,7 @@ from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import time
+import collections
 from _struct import *
 
 
@@ -43,74 +44,64 @@ class GravityModelWorker(QThread):
 
         # получение данных из формы
         layer_attr = self.dlg_model.comboBox_significance_attr.currentText()
-        layer_tc_attr = self.dlg_model.comboBox_significance_attr_2.currentText()
+        layer_centers_attr = self.dlg_model.comboBox_significance_attr_2.currentText()
         alpha = float(self.dlg_model.textEdit_significance_power.text())
         beta = float(self.dlg_model.textEdit_distance_power.text())
         layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
-        layer_tc = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
+        layer_centers = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
 
         # создаем точечный слой
-        point_layer = QgsVectorLayer("Point?crs=" + layer_tc.crs().authid(), f'{layer_tc.name()}', "memory")
+        point_layer = QgsVectorLayer("Point?crs=" + layer_centers.crs().authid(), f'{layer_centers.name()}', "memory")
         point_data = point_layer.dataProvider()
-        point_data.addAttributes(layer_tc.fields())
-        point_data.addFeatures(layer_tc.getFeatures())
+        point_data.addAttributes(layer_centers.fields())
+        point_data.addFeatures(layer_centers.getFeatures())
         point_layer.updateFields()
         QgsProject.instance().addMapLayer(point_layer, False)
-        layer_tc = point_layer
+        layer_centers = point_layer
 
         # создаем группу и помещаем туда слой
         group = QgsLayerTreeGroup('Гравитационная модель')
-        group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
+        group.insertChildNode(0, QgsLayerTreeLayer(layer_centers))
 
-
-        # new_attrs = []
-        # for i in range(layer_tc.featureCount()):
-        #     if layer.fields().indexFromName(f'tc_{i}') == -1: 
-        #         new_attrs.append(QgsField(f'tc_{i}', QVariant.Double))
-
-        # if new_attrs:
-        #     layer.dataProvider().addAttributes(new_attrs)
-        #     layer.updateFields()
+        # Precompute distances for center features
+        distances = {}
+        for center_feature in layer_centers.getFeatures():
+            center_feature_geometry = center_feature.geometry()
+            distances[center_feature.id()] = {feature.id(): feature.geometry().distance(center_feature_geometry) for feature in layer.getFeatures()}
         
-
-        # # добавляем поле 'weight'
-        # if layer_tc.fields().indexFromName('weight') == -1: 
-        #     layer_tc.dataProvider().addAttributes([QgsField('weight', QVariant.Double)])
-        #     layer_tc.updateFields()
-
-        # Словарь для записи информации о том, сколько людей пойдет к конкретному поставщику 
-        trip_id_to_count_dict = { }
+        layer_centers.startEditing()
+        for feature in layer.getFeatures():
+            feature_id = feature.id()
+            
+            interaction_volume_dict = {}
+            for center_feature in layer_centers.getFeatures():
+                center_feature_id = center_feature.id()
+                
+                distance = distances[center_feature_id][feature_id]                
+                interaction_volume = float(center_feature[layer_centers_attr]) ** alpha / distance ** beta                
+                interaction_volume_dict[center_feature_id] = interaction_volume
         
-        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля   
-        for f in list(layer.getFeatures()):
-            h_list = []
-            for tc in layer_tc.getFeatures():
-                h = float(tc[layer_tc_attr])**alpha / f.geometry().distance(tc.geometry())**beta
-                h_list.append(h)
-
-            total_h = sum(h_list)
-            vers = [round(h / total_h, 2) for h in h_list]
-            for i in range(len(vers)):
-                trip_id_to_count_dict[f'trips_count_{i}'] = round(vers[i] * float(f[layer_attr]) , 2)
-
-        # на основе предыдущих рассчетов считаем вес для каждого поставщика
-        # походу weight это сумма trip_id_to_count_dict
-        layer_tc.startEditing()
-        for tc in layer_tc.getFeatures():
-            result = layer.aggregate(QgsAggregateCalculator.Sum, f'tc_{tc.id() - 1}')[0] # в исходном tc нумерация id от 0, а в новом от 1
-            tc['weight'] = int(result)
-            layer_tc.updateFeature(tc)
-
-        layer_tc.commitChanges()
+            total_interaction_volume = sum(interaction_volume_dict.values())
+        
+            # Calculate probabilities and weights
+            layer_attr_value = float(feature[layer_attr])
+            for center_feature in layer_centers.getFeatures():
+                probability_f_to_center_f = interaction_volume_dict[center_feature.id()] / total_interaction_volume
+                weight = round(probability_f_to_center_f * layer_attr_value, 2)
+                center_feature['weight_GJKLGJW'] = weight
+        
+            layer_centers.updateFeatures([center_feature for center_feature in layer_centers.getFeatures()])
+        
+        layer_centers.commitChanges()
 
         # задание стиля для слоя поставщиков
-        graduated_size = QgsGraduatedSymbolRenderer('weight')
-        graduated_size.updateClasses(layer_tc, QgsGraduatedSymbolRenderer.EqualInterval, layer_tc.featureCount())
+        graduated_size = QgsGraduatedSymbolRenderer('weight_GJKLGJW')
+        graduated_size.updateClasses(layer_centers, QgsGraduatedSymbolRenderer.EqualInterval, layer_centers.featureCount())
         graduated_size.setGraduatedMethod(QgsGraduatedSymbolRenderer.GraduatedSize)
         graduated_size.setSymbolSizes(4, 10)
         graduated_size.updateRangeLabels()
-        layer_tc.setRenderer(graduated_size)
-        layer_tc.triggerRepaint()
+        layer_centers.setRenderer(graduated_size)
+        layer_centers.triggerRepaint()
 
         # добавляем созданную группу в проект
         root = QgsProject.instance().layerTreeRoot()
