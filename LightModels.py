@@ -17,7 +17,7 @@ from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import time
-import collections
+import uuid
 from _struct import *
 
 
@@ -37,18 +37,18 @@ class GravityModelWorker(QThread):
         self.dlg_model.close()
 
     def run(self):
-        self.progress.emit(0) # reset progressbar
-        print('grav model run')
+        print('Gravity model run')
         
+        self.progress.emit(0) # reset progressbar        
         #     self.progress.emit(int((i+1)/self.total*100)) # report the current progress via pyqt signal to reportProgress method of TaskTest-Class
 
         # получение данных из формы
-        layer_attr = self.dlg_model.comboBox_significance_attr.currentText()
-        layer_centers_attr = self.dlg_model.comboBox_significance_attr_2.currentText()
-        alpha = float(self.dlg_model.textEdit_significance_power.text())
-        beta = float(self.dlg_model.textEdit_distance_power.text())
         layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
         layer_centers = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
+        layer_field = self.dlg_model.comboBox_significance_attr.currentText()
+        layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
+        alpha = float(self.dlg_model.textEdit_significance_power.text())
+        beta = float(self.dlg_model.textEdit_distance_power.text())
 
         # создаем точечный слой
         point_layer = QgsVectorLayer("Point?crs=" + layer_centers.crs().authid(), f'{layer_centers.name()}', "memory")
@@ -62,6 +62,14 @@ class GravityModelWorker(QThread):
         # создаем группу и помещаем туда слой
         group = QgsLayerTreeGroup('Гравитационная модель')
         group.insertChildNode(0, QgsLayerTreeLayer(layer_centers))
+        
+        # Add field 'weight_...' with UUID to aboid potential conflicts
+        weight_field_name = 'weight_' + str(uuid.uuid4()).replace('-', '')
+        while not layer_centers.fields().indexFromName(weight_field_name) == -1: # Generate new UUID until unique
+            weight_field_name = 'weight_' + str(uuid.uuid4()).replace('-', '')
+        
+        layer_centers.dataProvider().addAttributes([QgsField(weight_field_name, QVariant.Double)])
+        layer_centers.updateFields()
 
         # Precompute distances for center features
         distances = {}
@@ -78,24 +86,25 @@ class GravityModelWorker(QThread):
                 center_feature_id = center_feature.id()
                 
                 distance = distances[center_feature_id][feature_id]                
-                interaction_volume = float(center_feature[layer_centers_attr]) ** alpha / distance ** beta                
+                interaction_volume = float(center_feature[layer_centers_field]) ** alpha / distance ** beta                
                 interaction_volume_dict[center_feature_id] = interaction_volume
         
             total_interaction_volume = sum(interaction_volume_dict.values())
-        
+
             # Calculate probabilities and weights
-            layer_attr_value = float(feature[layer_attr])
+            layer_field_value = float(feature[layer_field])
             for center_feature in layer_centers.getFeatures():
                 probability_f_to_center_f = interaction_volume_dict[center_feature.id()] / total_interaction_volume
-                weight = round(probability_f_to_center_f * layer_attr_value, 2)
-                center_feature['weight_GJKLGJW'] = weight
+                weight = round(probability_f_to_center_f * layer_field_value, 2)
+                center_feature[weight_field_name] = weight
+                
+                layer_centers.updateFeature(center_feature)
         
-            layer_centers.updateFeatures([center_feature for center_feature in layer_centers.getFeatures()])
         
         layer_centers.commitChanges()
 
         # задание стиля для слоя поставщиков
-        graduated_size = QgsGraduatedSymbolRenderer('weight_GJKLGJW')
+        graduated_size = QgsGraduatedSymbolRenderer(weight_field_name)
         graduated_size.updateClasses(layer_centers, QgsGraduatedSymbolRenderer.EqualInterval, layer_centers.featureCount())
         graduated_size.setGraduatedMethod(QgsGraduatedSymbolRenderer.GraduatedSize)
         graduated_size.setSymbolSizes(4, 10)
@@ -107,6 +116,7 @@ class GravityModelWorker(QThread):
         root = QgsProject.instance().layerTreeRoot()
         root.insertChildNode(0, group)
         
+        print('Gravity model finish')
         self.finished = True
         
        
@@ -379,7 +389,7 @@ class Models:
         # self.dockwidget.ok_button.setEnabled(True)
         self.pluginIsActive = False
         self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)     
-        print("plugin close")
+        print("Plugin close")
 
     def report_progress(self, n):
         self.dlg_model.progress_bar.setValue(n) # set the current progress in progress bar
@@ -402,10 +412,12 @@ class Models:
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.worker.stop)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.worker.progress.connect(self.report_progress)
+        
         self.thread.start()
         self.dockwidget.ok_button.setEnabled(False) # disable the OK button while thread is running
         self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
