@@ -294,9 +294,7 @@ class CentersModelWorker(QThread):
 
         end_time = time.time()
         execution_time = end_time - start_time
-        print(execution_time)
-
-        self.dlg_model.close()
+        print("Execution time:", execution_time)
         
         self.finished = True
 
@@ -419,8 +417,8 @@ class Models:
         self.worker.progress.connect(self.report_progress)
         
         self.thread.start()
-        self.dockwidget.ok_button.setEnabled(False) # disable the OK button while thread is running
-        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
+        self.dlg_model.ok_button.setEnabled(False) # disable the OK button while thread is running
+        self.thread.finished.connect(lambda: self.dlg_model.ok_button.setEnabled(True))
 
 
     def start_centers_model_worker(self):
@@ -430,14 +428,16 @@ class Models:
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.worker.stop)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.progress.connect(self.report_progress)
 
         self.thread.start()
         # disable / enable buttons
-        self.dockwidget.ok_button.setEnabled(False)
-        self.thread.finished.connect(lambda: self.dockwidget.ok_button.setEnabled(True))
+        self.dlg_model.ok_button.setEnabled(False)
+        self.thread.finished.connect(lambda: self.dlg_model.ok_button.setEnabled(True))
 
 
     def kill_current_model_worker(self):
