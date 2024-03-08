@@ -34,22 +34,22 @@ class GravityModelWorker(QThread):
             
     def stop(self):
         self.stopworker = True
-        self.dlg_model.close()
+        self.finished.emit()
 
     def run(self):
-        print('Gravity model run')
+        self.progress.emit(0) # reset progressbar       
+
+        layer, layer_centers, layer_field, layer_centers_field, alpha, beta = self.get_form_data()
+
+        self.run_gravity_model(layer, layer_centers, layer_field, layer_centers_field, alpha, beta)\
+
+        self.finished.emit()
         
-        self.progress.emit(0) # reset progressbar        
-        #     self.progress.emit(int((i+1)/self.total*100)) # report the current progress via pyqt signal to reportProgress method of TaskTest-Class
-
-        # получение данных из формы
-        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
-        layer_centers = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
-        layer_field = self.dlg_model.comboBox_significance_attr.currentText()
-        layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
-        alpha = float(self.dlg_model.textEdit_significance_power.text())
-        beta = float(self.dlg_model.textEdit_distance_power.text())
-
+    def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta):
+        # Progress bar data
+        feature_count = layer.featureCount() + layer_centers.featureCount()
+        current_progress = 0
+        
         # создаем точечный слой
         point_layer = QgsVectorLayer("Point?crs=" + layer_centers.crs().authid(), f'{layer_centers.name()}', "memory")
         point_data = point_layer.dataProvider()
@@ -76,6 +76,10 @@ class GravityModelWorker(QThread):
         for center_feature in layer_centers.getFeatures():
             center_feature_geometry = center_feature.geometry()
             distances[center_feature.id()] = {feature.id(): feature.geometry().distance(center_feature_geometry) for feature in layer.getFeatures()}
+            
+            # Track progress
+            current_progress += 100 / feature_count
+            self.progress.emit(current_progress)
         
         layer_centers.startEditing()
         for feature in layer.getFeatures():
@@ -99,7 +103,10 @@ class GravityModelWorker(QThread):
                 center_feature[weight_field_name] = weight
                 
                 layer_centers.updateFeature(center_feature)
-        
+            
+            # Track progress
+            current_progress += 100 / feature_count
+            self.progress.emit(current_progress)
         
         layer_centers.commitChanges()
 
@@ -115,10 +122,16 @@ class GravityModelWorker(QThread):
         # добавляем созданную группу в проект
         root = QgsProject.instance().layerTreeRoot()
         root.insertChildNode(0, group)
-        
-        print('Gravity model finish')
-        self.finished = True
-        
+
+    def get_form_data(self):
+        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
+        layer_centers = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
+        layer_field = self.dlg_model.comboBox_significance_attr.currentText()
+        layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
+        alpha = float(self.dlg_model.textEdit_significance_power.text())
+        beta = float(self.dlg_model.textEdit_distance_power.text())
+        return layer, layer_centers, layer_field, layer_centers_field, alpha, beta
+
        
 class CentersModelWorker(QThread):
     finished = pyqtSignal()
@@ -129,7 +142,7 @@ class CentersModelWorker(QThread):
         self.stopworker = False
 
         self.dlg_model = dlg_model
-        
+
     def stop(self):
         self.stopworker = True
         self.dlg_model.close()
@@ -296,7 +309,7 @@ class CentersModelWorker(QThread):
         execution_time = end_time - start_time
         print("Execution time:", execution_time)
         
-        self.finished = True
+        self.finished.emit()
 
 
 # реализация плагина
@@ -410,15 +423,12 @@ class Models:
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.worker.stop)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
         self.worker.progress.connect(self.report_progress)
+        self.worker.finished.connect(self.on_thread_finished)
+        self.worker.finished.connect(self.thread.quit)
         
-        self.thread.start()
         self.dlg_model.ok_button.setEnabled(False) # disable the OK button while thread is running
-        self.thread.finished.connect(lambda: self.dlg_model.ok_button.setEnabled(True))
+        self.thread.start()
 
 
     def start_centers_model_worker(self):
@@ -443,12 +453,17 @@ class Models:
     def kill_current_model_worker(self):
         self.worker.stop()
         
-        try: # to prevent a Python error when the cancel button has been clicked but no thread is running use try/except
-            if self.thread.isRunning():
-                self.thread.quit()
-        except:
-            pass
+        if self.thread.isRunning():
+            self.thread.quit()
         
+        self.thread.started.connect(self.worker.run)
+        self.worker.progress.connect(self.report_progress)
+        self.worker.finished.connect(self.on_thread_finished)
+        self.worker.finished.connect(self.thread.quit)
+        
+        
+    def on_thread_finished(self):
+        self.dlg_model.close()
 
     # --------------------------------------------------------------------------
 
@@ -468,7 +483,7 @@ class Models:
             for model_name in ['Гравитационная модель', 'Модель центральных мест', 'Модель 3']:
                 self.dockwidget.model_comboBox.addItem(model_name)
                 
-            self.dockwidget.ok_button.clicked.connect(self.run_model_dialog)     
+            self.dockwidget.ok_button.clicked.connect(self.run_model_dialog)
             
 
     def on_layer_combobox_changed_do_show_layer_attrs(self, layer_cmb, attrs_cmb):
@@ -523,280 +538,3 @@ class Models:
             self.start_gravity_model_worker()
         elif model == "Модель центральных мест":
             self.start_centers_model_worker()
-
-
-    def run_gravity_model(self):
-        # получение данных из формы
-        layer_attr = self.dlg_model.comboBox_significance_attr.currentText()
-        layer_tc_attr = self.dlg_model.comboBox_significance_attr_2.currentText()
-        alpha = float(self.dlg_model.textEdit_significance_power.text())
-        beta = float(self.dlg_model.textEdit_distance_power.text())
-        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
-        layer_tc = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
-
-        # создаем точечный слой
-        point_layer = QgsVectorLayer("Point?crs=" + layer_tc.crs().authid(), f'{layer_tc.name()}', "memory")
-        point_data = point_layer.dataProvider()
-        point_data.addAttributes(layer_tc.fields())
-        point_data.addFeatures(layer_tc.getFeatures())
-        point_layer.updateFields()
-        QgsProject.instance().addMapLayer(point_layer, False)
-        layer_tc = point_layer
-
-        # создаем группу и помещаем туда слой
-        group = QgsLayerTreeGroup('Гравитационная модель')
-        group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
-
-        # в слое потребителей создаем поля для записи информации о том, сколько людей пойдет к конкретному поставщику
-        new_attrs = []
-        for i in range(layer_tc.featureCount()):
-            if layer.fields().indexFromName(f'tc_{i}') == -1: 
-                new_attrs.append(QgsField(f'tc_{i}', QVariant.Double))
-                
-        if new_attrs:
-            layer.dataProvider().addAttributes(new_attrs)
-            layer.updateFields()
-
-        # добавляем поле 'weight'
-        if layer_tc.fields().indexFromName('weight') == -1: 
-            layer_tc.dataProvider().addAttributes([QgsField('weight', QVariant.Double)])
-            layer_tc.updateFields()
-            
-        task = GravityModelTask(layer, layer_tc, layer_attr, layer_tc_attr, alpha, beta)
-        QgsApplication.taskManager().addTask(task)
-        task.waitForFinished()
-
-        # задание стиля для слоя поставщиков
-        graduated_size = QgsGraduatedSymbolRenderer('weight')
-        graduated_size.updateClasses(layer_tc, QgsGraduatedSymbolRenderer.EqualInterval, layer_tc.featureCount())
-        graduated_size.setGraduatedMethod(QgsGraduatedSymbolRenderer.GraduatedSize)
-        graduated_size.setSymbolSizes(4, 10)
-        graduated_size.updateRangeLabels()
-        layer_tc.setRenderer(graduated_size)
-        layer_tc.triggerRepaint()
-
-        # добавляем созданную группу в проект
-        root = QgsProject().instance().layerTreeRoot()
-        root.insertChildNode(0, group)
-
-        self.dlg_model.close()
-
-
-    def run_centers_model(self):
-        # получаем данные из формы
-        start_time = time.time()
-        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
-        attr = self.dlg_model.comboBox_significance_attr.currentText()
-        multiplier = float(self.dlg_model.textEdit_significance_power.text())
-        stop = float(self.dlg_model.textEdit_distance_power.text())
-
-        # добавляем колонку "to", если ее нет
-        if layer.fields().indexFromName('to') == -1: 
-            layer.dataProvider().addAttributes([QgsField('to', QVariant.Int)])
-            layer.updateFields()
-
-        # возвращает id точки для соединения
-        def process_feature(f):
-            f_id = f.id()
-            population = int(f[attr])
-            if population > stop:
-                return f_id
-            else:
-                c = population * multiplier
-                ps = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression(f'{attr} > {c}')))
-                index = QgsSpatialIndex(layer.getFeatures(QgsFeatureRequest().setFilterExpression(f'{attr} > {c}')))
-                if not ps:
-                    return f_id
-                else:
-                    nearest_point_id = index.nearestNeighbor(f.geometry().asPoint(), 1)[0]
-                    return nearest_point_id
-        
-        # выполнение process_feature для каждой точки слоя в режиме многопоточности
-        with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(process_feature, f) for f in list(layer.getFeatures())]
-
-        # запись в колонку 'to' каждой точки - id точки для соединения
-        layer.startEditing()
-        features = list(layer.getFeatures())
-        for i in range(len(futures)):
-            result = futures[i].result()
-            features[i]['to'] = result
-            layer.updateFeature(features[i])
-        layer.commitChanges()
-
-        # ищет связанные точки для данной точки
-        def get_connected_features(feature, layer):
-            features = []
-            stack = [feature]
-            while stack:
-                current_feature = stack.pop()
-                features.append(current_feature)
-                connect_features = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression(f'"to" = {current_feature.id()} AND @id != {current_feature.id()}')))
-                stack.extend(connect_features)
-            return features
-
-        # возвращает список точек и линий, относящихся к данному центру
-        def process_center(center):
-            result = {'f' : [], 'l': []}
-            features_of_center = get_connected_features(center, layer)
-            # добавляем в слои точки и линии
-            for f in features_of_center:
-                result['f'].append(f)
-                p = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression(f'@id = {f["to"]}')))[0]
-                line_geom = QgsGeometry.fromPolyline([QgsPoint(f.geometry().asPoint()), QgsPoint(p.geometry().asPoint())])
-                line_feature = QgsFeature()
-                line_feature.setGeometry(line_geom)
-                result['l'].append(line_feature)
-            return result
-
-        group = QgsLayerTreeGroup('Модель центральных мест')
-
-        centers = list(layer.getFeatures(QgsFeatureRequest().setFilterExpression('@id = "to"')))
-
-        with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(process_center, center) for center in centers]
-
-        # создаем точечный слой зоны влияния центра
-        point_layer = QgsVectorLayer("Point?crs=" + layer.crs().authid(), 'пункты', "memory")
-        point_data = point_layer.dataProvider()
-        point_data.addAttributes(layer.fields())
-        point_data.addAttributes([QgsField('center', QVariant.Int)])
-        point_layer.updateFields()
-
-        # создаем линейный слой зоны влияния центра
-        line_layer = QgsVectorLayer('LineString?crs=' + layer.crs().authid(), 'линии', 'memory')
-        line_data = line_layer.dataProvider()
-        line_data.addAttributes([QgsField('center', QVariant.Int)])
-        line_layer.updateFields()
-        
-        # заполняем слой пунктов и линий объектами
-        for i in range(len(futures)):
-            result = futures[i].result()
-            for f in result['f']:
-                fd = f.fields()
-                a = f.attributes()
-                fd.append(QgsField('center', QVariant.Int))
-                f.setFields(fd)
-                f.setAttributes(a + [centers[i].id()])
-                point_data.addFeatures([f])
-            for f in result['l']:
-                fd = f.fields()
-                a = f.attributes()
-                fd.append(QgsField('center', QVariant.Int))
-                f.setFields(fd)
-                f.setAttributes(a + [centers[i].id()])
-                line_data.addFeatures([f])
-
-        # добавляем слои в проект
-        QgsProject.instance().addMapLayer(point_layer, False)
-        QgsProject.instance().addMapLayer(line_layer, False)
-
-        # создаем слой центров
-        centers_layer = QgsVectorLayer("Point?crs=" + layer.crs().authid(), "центры", "memory")
-        prov = centers_layer.dataProvider()
-        prov.addAttributes(layer.fields())
-        centers_layer.updateFields()
-        prov.addFeatures(centers)
-
-        # задание стиля слою центров
-        symbol = QgsMarkerSymbol.createSimple({'name': 'circle', 'color': 'orange'})
-        symbol.setSize(5)
-        renderer = QgsSingleSymbolRenderer(symbol)
-        centers_layer.setRenderer(renderer)
-        centers_layer.triggerRepaint()
-
-        QgsProject.instance().addMapLayer(centers_layer, False)
-
-        # создание стиля на основе уникальных значений атрибута для пунктов
-        renderer = QgsCategorizedSymbolRenderer('center') 
-        unique_values = point_layer.uniqueValues(point_layer.fields().indexOf('center'))
-        for value in unique_values:
-            symbol = QgsSymbol.defaultSymbol(point_layer.geometryType())
-            category = QgsRendererCategory(value, symbol, str(value))
-            renderer.addCategory(category)
-
-        # применение стиля к слою пунктов
-        point_layer.setRenderer(renderer)
-        point_layer.triggerRepaint()
-
-        # создание стиля на основе уникальных значений атрибута для линий
-        renderer = QgsCategorizedSymbolRenderer('center')
-        unique_values = line_layer.uniqueValues(line_layer.fields().indexOf('center'))
-        for value in unique_values:
-            symbol = QgsSymbol.defaultSymbol(line_layer.geometryType())
-            category = QgsRendererCategory(value, symbol, str(value))
-            renderer.addCategory(category)
-
-        # срименение стиля к слою линий
-        line_layer.setRenderer(renderer)
-        line_layer.triggerRepaint()
-
-        # добавлям слои в группу
-        group.insertChildNode(0, QgsLayerTreeLayer(centers_layer))
-        group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(point_layer))
-        group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(line_layer))
-
-        # добавляем созданную группу в проект
-        root = QgsProject().instance().layerTreeRoot()
-        root.insertChildNode(0, group)
-
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(execution_time)
-
-        self.dlg_model.close()
- 
-        
-class GravityModelTask(QgsTask):
-    def __init__(self, layer, layer_tc, layer_attr, layer_tc_attr, alpha, beta, parent=None):
-        super().__init__("Gravity Model Task")
-        self.parent = parent
-        self.layer = layer
-        self.layer_tc = layer_tc
-        self.layer_attr = layer_attr
-        self.layer_tc_attr = layer_tc_attr
-        self.alpha = alpha
-        self.beta = beta
-        
-    def run(self):
-        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
-        self.layer.startEditing()        
-        for f in list(self.layer.getFeatures()):
-            h_list = []
-            for tc in self.layer_tc.getFeatures():
-                h = float(tc[self.layer_tc_attr])**self.alpha / f.geometry().distance(tc.geometry())**self.beta
-                h_list.append(h)
-                
-            total_h = sum(h_list)
-            vers = [round(h / total_h, 2) for h in h_list]
-            for i in range(len(vers)):
-                f[f'tc_{i}'] = round(vers[i] * float(f[self.layer_attr]), 2)
-            self.layer.updateFeature(f)
-            
-        self.layer.commitChanges()
-        
-        # на основе предыдущих рассчетов считаем вес для каждого поставщика
-        self.layer_tc.startEditing()
-        for tc in self.layer_tc.getFeatures():
-            result = self.layer.aggregate(QgsAggregateCalculator.Sum, f'tc_{tc.id() - 1}')[0] # в исходном tc нумерация id от 0, а в новом от 1
-            tc['weight'] = int(result)
-            self.layer_tc.updateFeature(tc)
-            
-        self.layer_tc.commitChanges()
-
-
-class CentersModelTask(QgsTask):
-    def __init__(self, parent=None):
-        super().__init__("Centers Model Task")
-        self.parent = parent
-
-    def run(self):
-        # Perform heavy work for the centers model here
-        # Example heavy work:
-        for i in range(100):
-            # Simulate heavy work progress
-            QgsApplication.processEvents()
-            if self.isCanceled():
-                return False
-            # Your heavy work code goes here
-        return True
