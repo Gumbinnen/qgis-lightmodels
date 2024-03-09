@@ -13,13 +13,21 @@ from qgis.core import QgsField, QgsMapLayer, QgsWkbTypes, QgsProject, QgsVectorL
 from qgis.core import QgsAggregateCalculator, QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
 from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer, QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
 from qgis.core import QgsTask, QgsApplication
+from qgis.gui import QgsMapToolIdentifyFeature
 from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import time
 import uuid
 from _struct import *
-
+from qgis.utils import iface
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QWidget, QHBoxLayout
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtGui import QCursor
+from qgis.gui import QgsMapTool, QgsMapMouseEvent
+from multiprocessing import Pool
 
 
 class GravityModelWorker(QThread):
@@ -39,15 +47,16 @@ class GravityModelWorker(QThread):
     def run(self):
         self.progress.emit(0) # reset progressbar       
 
-        layer, layer_centers, layer_field, layer_centers_field, alpha, beta = self.get_form_data()
+        layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold = self.get_form_data()
 
-        self.run_gravity_model(layer, layer_centers, layer_field, layer_centers_field, alpha, beta)\
+        # main payload
+        self.run_gravity_model(layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold)
 
         self.finished.emit()
         
-    def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta):
-        # Progress bar data
-        feature_count = layer.featureCount() + layer_centers.featureCount()
+    def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold):
+        # Progress bar data. `progress_step` is 100% divided by features count, therefor used `features count` times in code.
+        progress_step = 100 / (2 * layer.featureCount() + layer_centers.featureCount())
         current_progress = 0
         
         # создаем точечный слой
@@ -57,6 +66,7 @@ class GravityModelWorker(QThread):
         point_data.addFeatures(layer_centers.getFeatures())
         point_layer.updateFields()
         QgsProject.instance().addMapLayer(point_layer, False)
+        # Computations modify new layer only. To achive this behaviour we're assigning a new point layer to layers_centers (because it based on layers_centers).
         layer_centers = point_layer
 
         # создаем группу и помещаем туда слой
@@ -72,42 +82,61 @@ class GravityModelWorker(QThread):
         layer_centers.updateFields()
 
         # Precompute distances for center features
-        distances = {}
+        distances_center_to_feature = {}
         for center_feature in layer_centers.getFeatures():
+            center_feature_id = center_feature.id()
             center_feature_geometry = center_feature.geometry()
-            distances[center_feature.id()] = {feature.id(): feature.geometry().distance(center_feature_geometry) for feature in layer.getFeatures()}
             
-            # Track progress
-            current_progress += 100 / feature_count
+            for feature in layer.getFeatures():
+                distance = feature.geometry().distance(center_feature_geometry)
+                if distance <= max_distance_thershold:
+                    distances_center_to_feature[center_feature_id] = {feature.id(): distance}
+                    
+                # Track progress for every feature
+                current_progress += progress_step
+                self.progress.emit(current_progress)
+                
+            # Track progress for every center feature
+            current_progress += progress_step
             self.progress.emit(current_progress)
         
+
         layer_centers.startEditing()
         for feature in layer.getFeatures():
+            # Track progress for every feature
+            current_progress += progress_step
+            self.progress.emit(current_progress)
+            
             feature_id = feature.id()
             
             interaction_volume_dict = {}
             for center_feature in layer_centers.getFeatures():
                 center_feature_id = center_feature.id()
+
+                distance = distances_center_to_feature.get(center_feature_id, {}).get(feature_id)
+                if distance == None:
+                    continue
                 
-                distance = distances[center_feature_id][feature_id]                
-                interaction_volume = float(center_feature[layer_centers_field]) ** alpha / distance ** beta                
+                interaction_volume = float(center_feature[layer_centers_field]) ** alpha / distance ** beta
                 interaction_volume_dict[center_feature_id] = interaction_volume
-        
+
             total_interaction_volume = sum(interaction_volume_dict.values())
+            if total_interaction_volume == 0:
+                continue
 
             # Calculate probabilities and weights
             layer_field_value = float(feature[layer_field])
             for center_feature in layer_centers.getFeatures():
-                probability_f_to_center_f = interaction_volume_dict[center_feature.id()] / total_interaction_volume
+                interaction_volume = interaction_volume_dict.get(center_feature.id())
+                if interaction_volume == None:
+                    continue
+                
+                probability_f_to_center_f = interaction_volume / total_interaction_volume
                 weight = round(probability_f_to_center_f * layer_field_value, 2)
                 center_feature[weight_field_name] = weight
                 
                 layer_centers.updateFeature(center_feature)
             
-            # Track progress
-            current_progress += 100 / feature_count
-            self.progress.emit(current_progress)
-        
         layer_centers.commitChanges()
 
         # задание стиля для слоя поставщиков
@@ -130,7 +159,8 @@ class GravityModelWorker(QThread):
         layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
         alpha = float(self.dlg_model.textEdit_significance_power.text())
         beta = float(self.dlg_model.textEdit_distance_power.text())
-        return layer, layer_centers, layer_field, layer_centers_field, alpha, beta
+        max_distance_thershold = float(self.dlg_model.textEdit_max_distance_thershold.text())
+        return layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold
 
        
 class CentersModelWorker(QThread):
@@ -145,16 +175,24 @@ class CentersModelWorker(QThread):
 
     def stop(self):
         self.stopworker = True
-        self.dlg_model.close()
+        self.finished.emit()
 
     def run(self):
         # получаем данные из формы
+        layer, attr, multiplier, stop = self.get_form_data()
+        
         start_time = time.time()
-        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
-        attr = self.dlg_model.comboBox_significance_attr.currentText()
-        multiplier = float(self.dlg_model.textEdit_significance_power.text())
-        stop = float(self.dlg_model.textEdit_distance_power.text())
+        
+        # main payload
+        self.run_centers_model(self, layer, attr, multiplier, stop)
+        
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("Execution time:", execution_time)
+        
+        self.finished.emit()
 
+    def run_centers_model(self, layer, attr, multiplier, stop):
         # добавляем колонку "to", если ее нет
         if layer.fields().indexFromName('to') == -1: 
             layer.dataProvider().addAttributes([QgsField('to', QVariant.Int)])
@@ -305,12 +343,13 @@ class CentersModelWorker(QThread):
         root = QgsProject.instance().layerTreeRoot()
         root.insertChildNode(0, group)
 
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print("Execution time:", execution_time)
-        
-        self.finished.emit()
-
+    
+    def get_form_data(self):
+        layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
+        field = self.dlg_model.comboBox_significance_attr.currentText()
+        multiplier = float(self.dlg_model.textEdit_significance_power.text())
+        stop = float(self.dlg_model.textEdit_distance_power.text())
+        return layer, field, multiplier, stop
 
 # реализация плагина
 class Models:
@@ -341,8 +380,6 @@ class Models:
         # QThread attributes
         self.thread = None
         self.worker = None
-
-        # print "** INITIALIZING Models"
 
         self.pluginIsActive = False
         self.dockwidget = None
@@ -391,7 +428,7 @@ class Models:
             parent=self.iface.mainWindow())
 
     # --------------------------------------------------------------------------
-
+            
     # закрытие плагина
     def on_close_plugin(self):
         self.dockwidget.closingPlugin.disconnect(self.on_close_plugin)
@@ -438,20 +475,18 @@ class Models:
         self.worker.moveToThread(self.thread) # move Worker-Class to a thread
         # Connect signals and slots:
         self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.worker.stop)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
         self.worker.progress.connect(self.report_progress)
+        self.worker.finished.connect(self.on_thread_finished)
+        self.worker.finished.connect(self.thread.quit)
 
         self.thread.start()
         # disable / enable buttons
         self.dlg_model.ok_button.setEnabled(False)
-        self.thread.finished.connect(lambda: self.dlg_model.ok_button.setEnabled(True))
 
 
     def kill_current_model_worker(self):
-        self.worker.stop()
+        if self.worker != None:
+            self.worker.stop()
         
         if self.thread.isRunning():
             self.thread.quit()
@@ -538,3 +573,4 @@ class Models:
             self.start_gravity_model_worker()
         elif model == "Модель центральных мест":
             self.start_centers_model_worker()
+
