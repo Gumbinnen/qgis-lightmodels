@@ -1,6 +1,6 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QVariant, QThread
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon, QColor
+from qgis.PyQt.QtWidgets import QAction, QApplication
 from .resources import *
 from .LightModels_dockwidget import ModelsDockWidget
 from .my_plugin_dialog import MyPluginDialog
@@ -13,7 +13,8 @@ from qgis.core import QgsField, QgsMapLayer, QgsWkbTypes, QgsProject, QgsVectorL
 from qgis.core import QgsAggregateCalculator, QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
 from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer, QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
 from qgis.core import QgsTask, QgsApplication
-from qgis.gui import QgsMapToolIdentifyFeature
+from qgis.gui import QgsMapToolIdentifyFeature, QgsMapToolIdentify
+from qgis.gui import QgsMapToolEmitPoint
 from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -383,11 +384,14 @@ class Models:
 
         self.pluginIsActive = False
         self.dockwidget = None
+        
+        self.active_layer = None
 
 
     def tr(self, message):
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('Models', message)
+
 
     def add_action(
             self,
@@ -418,31 +422,30 @@ class Models:
         self.actions.append(action)
         return action
 
+
     def initGui(self):
-        """Create the menu entries and toolbar icons inside the QGIS GUI."""
         icon_path = ':/plugins/LightModels/icon.png'
         self.add_action(
             icon_path,
             text=self.tr(u'LightModels'),
             callback=self.run,
             parent=self.iface.mainWindow())
-
-    # --------------------------------------------------------------------------
-            
+    
+    # ______________________________________________________________________________________________
+        
     # закрытие плагина
     def on_close_plugin(self):
         self.dockwidget.closingPlugin.disconnect(self.on_close_plugin)
         self.dockwidget.model_comboBox.clear()
-        # self.dockwidget.message_label.clear()
-        # self.dockwidget.ok_button.setEnabled(True)
+        self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)
+        self.active_layer.selectionChanged.disconnect(self.process_selected_features_ids)
         self.pluginIsActive = False
-        self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)     
         print("Plugin close")
+
 
     def report_progress(self, n):
         self.dlg_model.progress_bar.setValue(n) # set the current progress in progress bar
         
-
     # удаление меню плагина и иконки с qgis интерфейса
     def unload(self):
         for action in self.actions:
@@ -488,21 +491,33 @@ class Models:
         if self.worker != None:
             self.worker.stop()
         
-        if self.thread.isRunning():
-            self.thread.quit()
+        if self.thread != None:
+            if self.thread.isRunning():
+                self.thread.quit()
         
-        self.thread.started.connect(self.worker.run)
-        self.worker.progress.connect(self.report_progress)
-        self.worker.finished.connect(self.on_thread_finished)
-        self.worker.finished.connect(self.thread.quit)
+            self.thread.started.disconnect(self.worker.run)
+            self.worker.progress.disconnect(self.report_progress)
+            self.worker.finished.disconnect(self.on_thread_finished)
+            self.worker.finished.disconnect(self.thread.quit)
         
         
     def on_thread_finished(self):
         self.dlg_model.close()
 
-    # --------------------------------------------------------------------------
 
-
+    def process_selected_features_ids(self, selected_features_ids, result2, result3):
+        
+        def print_population(feature_id):
+            for feature in self.active_layer.getFeatures():
+                if feature.id() == feature_id:
+                    print("Feature population:", feature['POPULATION'])
+                    
+        self.active_layer = self.iface.activeLayer() #? Is in place? active_layer.selectionChanged referes to feature selection or layer selection?
+        if len(selected_features_ids) == 1:
+            print_population(selected_features_ids[0])
+    
+    # ______________________________________________________________________________________________
+            
     # работа плагина
     def run(self):
         # инициализация базового окна
@@ -520,6 +535,14 @@ class Models:
                 
             self.dockwidget.ok_button.clicked.connect(self.run_model_dialog)
             
+            # Feature selection
+            self.active_layer = self.iface.activeLayer()
+            self.active_layer.selectionChanged.connect(self.process_selected_features_ids)
+            
+            self.iface.actionSelect().trigger()
+            self.iface.mapCanvas().setSelectionColor(QColor("light blue"))
+        
+
 
     def on_layer_combobox_changed_do_show_layer_attrs(self, layer_cmb, attrs_cmb):
         layer = layer_cmb.itemData(layer_cmb.currentIndex())
