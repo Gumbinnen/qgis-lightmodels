@@ -8,7 +8,7 @@ from qgis.core import QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRe
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import time
-import sqlite3
+import re
 
 class GravityModelWorker(QThread):
     finished = pyqtSignal() # pyqtSignal for when task is finished
@@ -26,17 +26,49 @@ class GravityModelWorker(QThread):
         self.is_calcelation_requested = False
         self.finished.emit()
         
-    def report_progress(self, n):
+    def report_progress(self, n: float):
         self.dlg_model.progress_bar.setValue(n) # set the current progress in progress bar
+        
+    def is_valid_form_data(self, form_data: tuple) -> bool:
+        layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold = form_data
+
+        num_format = re.compile(r'^\-?[1-9][0-9]*\.?[0-9]*')
+
+        if not num_format.search(alpha):
+            self.show_validation_error("bad alpha")
+            return False
+
+        if not num_format.search(beta):
+            self.show_validation_error("bad beta")
+            return False
+
+        if not num_format.search(max_distance_thershold):
+            self.show_validation_error("bad distance")
+            return False
+
+        if not num_format.search(layer[layer_field]):
+            self.show_validation_error("bad layer field")
+            return False
+
+        if not num_format.search(layer_centers[layer_centers_field]):
+            self.show_validation_error("bad layer centers field")
+            return False
+
+        return True
+    
+    def show_validation_error(self, e: str):
+        print("Gravity model validation error:", e)
         
     def run(self):
         self.is_running = True
         self.progress.emit(0) # reset progressbar
-
-        layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold = self.get_form_data()
+        
+        form_data = self.get_form_data()
+        if not self.is_valid_form_data(form_data):
+            self.finished.emit()
+            return
         # main payload
-        self.run_gravity_model(layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold)
-        #!!! Break down run_gravity_model into small steps and loops. Better calcelation.
+        self.run_gravity_model(form_data)
 
         self.finished.emit()
         
