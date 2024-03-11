@@ -149,6 +149,19 @@
     <string>ОК</string>
    </property>
   </widget>
+  <widget class="QPushButton" name="cancel_button">
+   <property name="geometry">
+    <rect>
+     <x>90</x>
+     <y>210</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Отмена</string>
+   </property>
+  </widget>
  </widget>
  <tabstops>
   <tabstop>comboBox_feature_layer</tabstop>
