@@ -126,6 +126,16 @@
     <string>500000</string>
    </property>
   </widget>
+  <widget class="QProgressBar" name="progress_bar">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>190</y>
+     <width>381</width>
+     <height>18</height>
+    </rect>
+   </property>
+  </widget>
   <widget class="QPushButton" name="ok_button">
    <property name="geometry">
     <rect>
