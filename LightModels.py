@@ -1,6 +1,6 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread
 from qgis.PyQt.QtGui import QIcon, QColor
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QAction, QWidget
 from .resources import *
 from .LightModels_dockwidget import ModelsDockWidget
 from .my_plugin_dialog import MyPluginDialog
@@ -13,7 +13,53 @@ from _struct import *
 from qgis.utils import iface
 from qgis.PyQt.QtCore import Qt
 from .model_worker import GravityModelWorker, CentersModelWorker
+from qgis.PyQt.QtWidgets import QVBoxLayout, QPushButton
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+from qgis.PyQt.QtCore import QObject, pyqtSignal
+from qgis.core import QgsProject, QgsVectorLayer
+from qgis.gui import QgsMapTool
+from qgis.core import QgsMapLayerProxyModel, QgsProject
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtGui import QPixmap, QImage
+from qgis.PyQt.QtWidgets import QLabel
 
+class DiagramWindow(QWidget):
+    def __init__(self, parent=None):
+        super(DiagramWindow, self).__init__(parent)
+        self.setWindowTitle("Diagram")
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.canvas)
+        self.close_button = QPushButton("Закрыть")
+        self.close_button.clicked.connect(self.close)
+        self.layout.addWidget(self.close_button)
+        self.setLayout(self.layout)
+
+    def plot_diagram(self, data):
+        # Столбчатая диаграмма
+        # self.figure.clear()
+        # ax = self.figure.add_subplot(111)
+        # x = [d[0] for d in data]  # Feature IDs
+        # y = [d[1] for d in data]  # Attribute values
+        # ax.bar(x, y)
+        # ax.set_xlabel('Feature ID')
+        # ax.set_ylabel('Attribute Value')
+        # ax.set_title('Diagram of Feature Related Data')
+        # self.canvas.draw()
+        
+        # Круговая диаграмма
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        labels = [f'{d[0]}' for d in data]
+        sizes = [d[1] for d in data] 
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
+        ax.set_title('Вероятности')
+        self.canvas.draw()
+        
+    
 
 # реализация плагина
 class Models:
@@ -50,6 +96,45 @@ class Models:
         
         # Active layer for feature selection
         self.active_layer = None
+        self.diagram_window = None
+
+
+    def set_active_layer(self, layer):
+        if isinstance(layer, QgsVectorLayer):
+            self.active_layer = layer
+            self.active_layer.selectionChanged.connect(self.create_diagram)
+
+    def create_diagram(self):
+        if self.active_layer is None:
+            print('Error: self.active_layer is None')
+            return
+
+        # selected_features = self.active_layer.selectedFeatures()
+
+        # feature_data = []
+        # for feature in selected_features:
+            
+        #     feature_id = feature.id()
+        #     feature_attributes = feature.attributes()
+            
+        #     attribute_value = feature['POPULATION']
+        #     feature_data.append((feature_id, attribute_value))
+
+        f_data = [('Цинциннати', 52), ('Кливленд', 37), ('whatever', 11)]
+
+        # Show diagram
+        self.show_diagram(f_data)
+
+    def show_diagram(self, data):
+        if not self.diagram_window:
+            self.diagram_window = DiagramWindow()
+        self.diagram_window.plot_diagram(data)
+        self.diagram_window.show()
+
+    def close_diagram(self):
+        if self.diagram_window:
+            self.diagram_window.close()
+            self.diagram_window = None
 
 
     def tr(self, message):
@@ -158,14 +243,7 @@ class Models:
 
 
     def process_selected_features_ids(self, selected_features_ids, result2, result3):
-        
-        def print_population(feature_id):
-            for feature in self.active_layer.getFeatures():
-                if feature.id() == feature_id:
-                    print("Feature population:", feature['POPULATION'])
-                    
-        if len(selected_features_ids) == 1:
-            print_population(selected_features_ids[0])
+        self.create_diagram()
     
     # ______________________________________________________________________________________________
             
