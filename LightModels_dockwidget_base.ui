@@ -10,13 +10,13 @@
     <x>0</x>
     <y>0</y>
     <width>300</width>
-    <height>89</height>
+    <height>144</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>104</width>
-    <height>89</height>
+    <width>185</width>
+    <height>118</height>
    </size>
   </property>
   <property name="maximumSize">
@@ -45,33 +45,7 @@
     </size>
    </property>
    <layout class="QGridLayout" name="gridLayout">
-    <item row="3" column="1">
-     <widget class="QLabel" name="message_label">
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0" colspan="2">
-     <widget class="QComboBox" name="model_comboBox">
-      <property name="autoFillBackground">
-       <bool>false</bool>
-      </property>
-      <property name="editable">
-       <bool>false</bool>
-      </property>
-      <property name="currentText">
-       <string/>
-      </property>
-      <property name="frame">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="3" column="0">
+    <item row="5" column="0">
      <widget class="QPushButton" name="ok_button">
       <property name="enabled">
        <bool>true</bool>
@@ -96,6 +70,29 @@
       </property>
       <property name="text">
        <string>Далее</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0" colspan="2">
+     <widget class="QComboBox" name="model_comboBox">
+      <property name="autoFillBackground">
+       <bool>false</bool>
+      </property>
+      <property name="editable">
+       <bool>false</bool>
+      </property>
+      <property name="currentText">
+       <string/>
+      </property>
+      <property name="frame">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="1">
+     <widget class="QPushButton" name="pushButton">
+      <property name="text">
+       <string>Diagram Tool</string>
       </property>
      </widget>
     </item>

@@ -29,32 +29,29 @@ class GravityModelWorker(QThread):
     def report_progress(self, n: float):
         self.dlg_model.progress_bar.setValue(n) # set the current progress in progress bar
         
-    def is_valid_form_data(self, form_data: tuple) -> bool:
+    def validate_form_data(self, form_data: tuple) -> tuple:
+        is_validation_errors = False
         layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold = form_data
 
-        num_format = re.compile(r'^\-?[1-9][0-9]*\.?[0-9]*')
-
-        if not num_format.search(alpha):
+        num_pattern = re.compile(r'^\-?[1-9][0-9]*\.?[0-9]*$')
+        
+        if not num_pattern.search(str(alpha)):
             self.show_validation_error("bad alpha")
-            return False
-
-        if not num_format.search(beta):
+            is_validation_errors = True
+        
+        if not num_pattern.search(str(beta)):
             self.show_validation_error("bad beta")
-            return False
-
-        if not num_format.search(max_distance_thershold):
+            is_validation_errors = True
+        
+        if not num_pattern.search(str(max_distance_thershold)):
             self.show_validation_error("bad distance")
-            return False
-
-        if not num_format.search(layer[layer_field]):
-            self.show_validation_error("bad layer field")
-            return False
-
-        if not num_format.search(layer_centers[layer_centers_field]):
-            self.show_validation_error("bad layer centers field")
-            return False
-
-        return True
+            is_validation_errors = True
+        
+        if is_validation_errors:
+            return (False, None)
+        
+        validated_form_data = (layer, layer_centers, layer_field, layer_centers_field, float(alpha), float(beta), float(max_distance_thershold))
+        return (True, validated_form_data)
     
     def show_validation_error(self, e: str):
         print("Gravity model validation error:", e)
@@ -64,15 +61,19 @@ class GravityModelWorker(QThread):
         self.progress.emit(0) # reset progressbar
         
         form_data = self.get_form_data()
-        if not self.is_valid_form_data(form_data):
+        
+        is_valid, validated_form_data = self.validate_form_data(form_data)
+        if not is_valid:
             self.finished.emit()
             return
+        
         # main payload
-        self.run_gravity_model(form_data)
-
+        self.run_gravity_model(*validated_form_data)
+        
         self.finished.emit()
         
-    def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold):        
+    def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold):
+        
         # Progress bar data. `progress_step` is 100% divided by features count, therefor used `features count` times in code.
         progress_step = 100 / (2 * layer.featureCount() + layer_centers.featureCount())
         current_progress = 0
@@ -198,9 +199,9 @@ class GravityModelWorker(QThread):
         layer_centers = self.dlg_model.comboBox_feature_layer_2.itemData(self.dlg_model.comboBox_feature_layer_2.currentIndex())
         layer_field = self.dlg_model.comboBox_significance_attr.currentText()
         layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
-        alpha = float(self.dlg_model.textEdit_significance_power.text())
-        beta = float(self.dlg_model.textEdit_distance_power.text())
-        max_distance_thershold = float(self.dlg_model.textEdit_max_distance_thershold.text())
+        alpha = self.dlg_model.textEdit_significance_power.text()
+        beta = self.dlg_model.textEdit_distance_power.text()
+        max_distance_thershold = self.dlg_model.textEdit_max_distance_thershold.text()
         return layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold
 
 
