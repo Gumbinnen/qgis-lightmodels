@@ -122,7 +122,6 @@ class DiagramWindow(QWidget):
     def show_minimized(self):
         print('test: show_minimized')
 
-
 # реализация плагина
 class Models:
     def __init__(self, iface):
@@ -241,10 +240,16 @@ class Models:
 
 
     def initGui(self):
-        icon_path = ':/plugins/LightModels/icon.png'
+        gravity_icon_path = self.plugin_dir + '/gravity_icon.png'
+        reggression_icon_path = self.plugin_dir + '/regression_icon.png'
         self.add_action(
-            icon_path,
-            text=self.tr(u'LightModels'),
+            gravity_icon_path,
+            text=self.tr(u'LightModels gravity model'),
+            callback=self.run,
+            parent=self.iface.mainWindow())
+        self.add_action(
+            reggression_icon_path,
+            text=self.tr(u'LightModels regression model'),
             callback=self.run,
             parent=self.iface.mainWindow())
     
