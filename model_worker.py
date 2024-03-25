@@ -1,14 +1,17 @@
 from qgis.PyQt.QtCore import QVariant, QThread
 from PyQt5.QtCore import pyqtSignal
-from qgis.core import QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer
+from qgis.core import QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsVectorFileWriter
 from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer
-from qgis.core import QgsGeometry, QgsPoint, QgsFeature
-from qgis.core import QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
+from qgis.core import QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes
+from qgis.core import QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer, QgsCoordinateTransformContext
 from qgis.core import QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import time
 import re
+import json
+import os
+import tempfile
 
 class GravityModelWorker(QThread):
     finished = pyqtSignal() # pyqtSignal for when task is finished
@@ -55,6 +58,33 @@ class GravityModelWorker(QThread):
     
     def show_validation_error(self, e: str):
         print("Gravity model validation error:", e)
+ 
+    def create_point_layer(self, layer, temp_gpkg_file):
+        layer_copy = layer.clone()
+
+        new_field_name = 'LM_weight'
+        new_field = QgsField(new_field_name, QVariant.Double)
+
+        layer_copy.addAttribute(new_field)
+        layer_copy.updateFields()
+
+        gpkg_writer = QgsVectorFileWriter(temp_gpkg_file, "UTF-8", layer_copy.fields(), layer_copy.geometryType(), layer_copy.crs(), "GPKG")
+
+        if gpkg_writer.hasError() != QgsVectorFileWriter.NoError:
+            print("Error when creating GeoPackage:", gpkg_writer.errorMessage())
+            return None
+        
+        gpkg_writer.addFeatures(layer_copy.getFeatures())
+
+        del gpkg_writer
+        
+        layer_temp = QgsVectorLayer(temp_gpkg_file, "Temporary Layer", "ogr")
+        if not layer_temp.isValid():
+            print("Error loading temporary layer from GeoPackage")
+            return None 
+        else:
+            QgsProject.instance().addMapLayer(layer_temp)
+            return layer_temp
         
     def run(self):
         self.is_running = True
@@ -73,32 +103,60 @@ class GravityModelWorker(QThread):
         self.finished.emit()
         
     def run_gravity_model(self, layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold):
-        
         # Progress bar data. `progress_step` is 100% divided by features count, therefor used `features count` times in code.
         progress_step = 100 / (2 * layer.featureCount() + layer_centers.featureCount())
         current_progress = 0
         
-        # создаем точечный слой
-        point_layer = QgsVectorLayer("Point?crs=" + layer_centers.crs().authid(), f'{layer_centers.name()}', "memory")
+        # создаем точечный слой для feature_centers
+        point_layer = QgsVectorLayer("Point?crs=" + layer_centers.crs().authid(), f'{layer_centers.name()}_lm', "memory")
         point_data = point_layer.dataProvider()
         point_data.addAttributes(layer_centers.fields())
         point_data.addFeatures(layer_centers.getFeatures())
         point_layer.updateFields()
         QgsProject.instance().addMapLayer(point_layer, False)
-        # Computations modify new layer only. To achive this behaviour we're assigning a new point layer to layers_centers (because it based on layers_centers).
+        # Computations modify new layer only. To achive this behaviour we're assigning a new point layer to layers_centers (because it based on layers_centers)
         layer_centers = point_layer
+        
+        # # Save vactor to temporary file
+        # plugin_dir = os.path.dirname(__file__)
+        # temp_gpkg_file = os.path.join(plugin_dir, "temp/temporary_file.gpkg")
+        
+        # options = QgsVectorFileWriter.SaveVectorOptions()
+        # options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+        # options.layerName = f'{layer_centers.name()}_lm'
+        
+        # try:
+        #     # Save point layer to temporary GeoPackage file
+        #     error = QgsVectorFileWriter.writeAsVectorFormatV2(
+        #         layer=layer_centers,
+        #         fileName=temp_gpkg_file,
+        #         transformContext=QgsCoordinateTransformContext(),
+        #         options=options
+        #     )
+
+        #     if error[0] != QgsVectorFileWriter.NoError:
+        #         print("Error saving layer to GeoPackage:", error[1])
+        #         print(error)
+    
+        # except Exception as e:
+        #     print("Error QgsVectorFileWriter:", e)
+        
+        # QgsProject.instance().addMapLayer(layer_centers, False)
         
         # создаем группу и помещаем туда слой
         group = QgsLayerTreeGroup('Гравитационная модель')
         group.insertChildNode(0, QgsLayerTreeLayer(layer_centers))
-        
         # Add field 'weight_...' with UUID to aboid potential conflicts
         weight_field_name = 'weight_' + str(uuid.uuid4()).replace('-', '')
         while not layer_centers.fields().indexFromName(weight_field_name) == -1: # Generate new UUID until unique
             weight_field_name = 'weight_' + str(uuid.uuid4()).replace('-', '')
-        
+            
         layer_centers.dataProvider().addAttributes([QgsField(weight_field_name, QVariant.Double)])
         layer_centers.updateFields()
+        
+        # добавляем созданную группу в проект
+        root = QgsProject.instance().layerTreeRoot()
+        root.insertChildNode(0, group)
         
         # Precompute distances for center features
         distances_center_to_feature = {}
@@ -127,8 +185,11 @@ class GravityModelWorker(QThread):
             current_progress += progress_step
             self.progress.emit(current_progress)
         
+        layer.startEditing()
         layer_centers.startEditing()
         for feature in layer.getFeatures():
+            # transition_probabilities_json = []
+            
             if self.is_calcelation_requested:
                 self.stop()
                 return
@@ -174,7 +235,11 @@ class GravityModelWorker(QThread):
                 center_feature[weight_field_name] = weight
                 
                 layer_centers.updateFeature(center_feature)
+                
+                # Diagram data
+                # transition_probabilities_json.append({"feature_id": center_feature.id(), "probability": probability_f_to_center_f})
             
+        layer.commitChanges()
         layer_centers.commitChanges()
 
         # задание стиля для слоя поставщиков
@@ -191,8 +256,8 @@ class GravityModelWorker(QThread):
             return
 
         # добавляем созданную группу в проект
-        root = QgsProject.instance().layerTreeRoot()
-        root.insertChildNode(0, group)
+        # root = QgsProject.instance().layerTreeRoot()
+        # root.insertChildNode(0, group)
 
     def get_form_data(self):
         layer = self.dlg_model.comboBox_feature_layer.itemData(self.dlg_model.comboBox_feature_layer.currentIndex())
@@ -203,6 +268,12 @@ class GravityModelWorker(QThread):
         beta = self.dlg_model.textEdit_distance_power.text()
         max_distance_thershold = self.dlg_model.textEdit_max_distance_thershold.text()
         return layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold
+
+    def get_temp_file_path(plugin_dir, filename):
+        temp_dir = os.path.join(plugin_dir, "temp")
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        return os.path.join(temp_dir, filename)
 
 
 class CentersModelWorker(QThread):

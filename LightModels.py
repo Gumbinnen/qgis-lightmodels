@@ -1,6 +1,6 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread
 from qgis.PyQt.QtGui import QIcon, QColor
-from qgis.PyQt.QtWidgets import QAction, QWidget
+from qgis.PyQt.QtWidgets import QAction, QWidget, QHBoxLayout
 from .resources import *
 from .LightModels_dockwidget import ModelsDockWidget
 from .my_plugin_dialog import MyPluginDialog
@@ -24,18 +24,71 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QPixmap, QImage
 from qgis.PyQt.QtWidgets import QLabel
 
+class TitleBar(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.initUI()
+
+    def initUI(self):
+        layout = QHBoxLayout()
+
+        # Add pin button
+        self.pin_button = QPushButton(QIcon('./YandexDisk.png'), '')
+        self.pin_button.setCheckable(True)
+        self.pin_button.setChecked(False)
+        self.pin_button.clicked.connect(self.parent.toggle_pin)
+        layout.addWidget(self.pin_button)
+
+        # Add minimize button
+        minimize_button = QPushButton(QIcon('./minimize_icon.ico'), '')
+        minimize_button.clicked.connect(self.parent.show_minimized)
+        layout.addWidget(minimize_button)
+
+        # Add close button
+        close_button = QPushButton(QIcon('./close_icon.ico'), '')
+        close_button.clicked.connect(self.parent.close)
+        layout.addWidget(close_button)
+
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+
 class DiagramWindow(QWidget):
     def __init__(self, parent=None):
         super(DiagramWindow, self).__init__(parent)
+        self.initUI()
+        
+
+    def initUI(self):        
         self.setWindowTitle("Diagram")
+        self.layout = QVBoxLayout()
+        
+        # Title bar
+        # self.title_bar = TitleBar(self)
+        # self.title_bar.setObjectName('TitleBar')
+        # self.layout.addWidget(self.title_bar)
+        
+        # Content
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
-        self.layout = QVBoxLayout()
         self.layout.addWidget(self.canvas)
+        
+        # Close button
         self.close_button = QPushButton("Закрыть")
         self.close_button.clicked.connect(self.close)
         self.layout.addWidget(self.close_button)
+
+        # Create pin button
+        self.pin_button = QPushButton('Всегда наверху')
+        self.pin_button.setCheckable(True)
+        self.pin_button.setChecked(False)
+        self.pin_button.clicked.connect(self.toggle_pin)
+        self.layout.addWidget(self.pin_button)
+        
         self.setLayout(self.layout)
+        # Make default title bar disaper
+        # self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
 
     def plot_diagram(self, data):
         # Столбчатая диаграмма
@@ -59,7 +112,16 @@ class DiagramWindow(QWidget):
         ax.set_title('Вероятности')
         self.canvas.draw()
         
-    
+    def toggle_pin(self):
+        if self.pin_button.isChecked():
+            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
+        self.show()
+        
+    def show_minimized(self):
+        print('test: show_minimized')
+
 
 # реализация плагина
 class Models:
@@ -104,7 +166,11 @@ class Models:
             self.active_layer = layer
             self.active_layer.selectionChanged.connect(self.create_diagram)
 
-    def create_diagram(self):
+
+    def get_feature_data_from_ids(self, ids):
+        pass
+
+    def create_diagram(self, data):
         if self.active_layer is None:
             print('Error: self.active_layer is None')
             return
@@ -119,17 +185,19 @@ class Models:
             
         #     attribute_value = feature['POPULATION']
         #     feature_data.append((feature_id, attribute_value))
-
+        
         f_data = [('Цинциннати', 52), ('Кливленд', 37), ('whatever', 11)]
 
         # Show diagram
         self.show_diagram(f_data)
+
 
     def show_diagram(self, data):
         if not self.diagram_window:
             self.diagram_window = DiagramWindow()
         self.diagram_window.plot_diagram(data)
         self.diagram_window.show()
+
 
     def close_diagram(self):
         if self.diagram_window:
@@ -184,13 +252,19 @@ class Models:
         
     # закрытие плагина
     def on_close_plugin(self):
-        self.dockwidget.closingPlugin.disconnect(self.on_close_plugin)
+        self.disconnect_slots_and_signals()
         self.dockwidget.model_comboBox.clear()
-        self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)
-        self.active_layer.selectionChanged.disconnect(self.process_selected_features_ids)
         self.pluginIsActive = False
         print("Plugin close")
 
+
+    def disconnect_slots_and_signals(self):
+        # if self.dockwidget.closingPlugin.isConnected():
+        self.dockwidget.closingPlugin.disconnect(self.on_close_plugin)
+        # if self.dockwidget.ok_button.clicked.isConnected():
+        self.dockwidget.ok_button.clicked.disconnect(self.run_model_dialog)
+        # if self.active_layer.selectionChanged.isConnected():
+        # self.active_layer.selectionChanged.disconnect(self.process_selected_features_ids)
 
     # удаление меню плагина и иконки с qgis интерфейса
     def unload(self):
@@ -243,7 +317,21 @@ class Models:
 
 
     def process_selected_features_ids(self, selected_features_ids, result2, result3):
-        self.create_diagram()
+        data = self.get_feature_data_from_ids(selected_features_ids)
+        self.create_diagram(data)
+    
+    
+    def run_diagram_tool(self):
+        self.active_layer = self.iface.activeLayer() #!!! Change active_layer changing mechanism
+        if self.active_layer:
+            self.active_layer.selectionChanged.connect(self.process_selected_features_ids)
+                
+        self.iface.actionSelect().trigger()
+        self.iface.mapCanvas().setSelectionColor(QColor("light blue"))
+    
+    
+    def stop_diagram_tool(self):
+        self.active_layer.selectionChanged.disconnect(self.process_selected_features_ids)
     
     # ______________________________________________________________________________________________
             
@@ -265,14 +353,10 @@ class Models:
             self.dockwidget.ok_button.clicked.connect(self.run_model_dialog)
             
             # Feature selection
-            self.active_layer = self.iface.activeLayer() #!!! Change active_layer changing mechanism
-            if self.active_layer:
-                self.active_layer.selectionChanged.connect(self.process_selected_features_ids)
+            self.dockwidget.diagram_tool_button.clicked.connect(self.run_diagram_tool)
+            self.dockwidget.diagram_tool_stop_button.clicked.connect(self.stop_diagram_tool)
             
-            self.iface.actionSelect().trigger()
-            self.iface.mapCanvas().setSelectionColor(QColor("light blue"))
-        
-
+            
     def on_layer_combobox_changed_do_show_layer_attrs(self, layer_cmb, attrs_cmb):
         layer = layer_cmb.itemData(layer_cmb.currentIndex())
         attributes = [field.name() for field in layer.fields()]
