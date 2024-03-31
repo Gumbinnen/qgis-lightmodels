@@ -117,31 +117,31 @@ class GravityModelWorker(QThread):
         # Computations modify new layer only. To achive this behaviour we're assigning a new point layer to layers_centers (because it based on layers_centers)
         layer_centers = point_layer
         
-        # # Save vactor to temporary file
-        # plugin_dir = os.path.dirname(__file__)
-        # temp_gpkg_file = os.path.join(plugin_dir, "temp/temporary_file.gpkg")
+        # Save vactor to temporary file
+        plugin_dir = os.path.dirname(__file__)
+        temp_gpkg_file = os.path.join(plugin_dir, "temp/temporary_file.gpkg")
         
-        # options = QgsVectorFileWriter.SaveVectorOptions()
-        # options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-        # options.layerName = f'{layer_centers.name()}_lm'
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+        options.layerName = f'{layer_centers.name()}_lm'
         
-        # try:
-        #     # Save point layer to temporary GeoPackage file
-        #     error = QgsVectorFileWriter.writeAsVectorFormatV2(
-        #         layer=layer_centers,
-        #         fileName=temp_gpkg_file,
-        #         transformContext=QgsCoordinateTransformContext(),
-        #         options=options
-        #     )
+        try:
+            # Save point layer to temporary GeoPackage file
+            error = QgsVectorFileWriter.writeAsVectorFormatV2(
+                layer=layer_centers,
+                fileName=temp_gpkg_file,
+                transformContext=QgsCoordinateTransformContext(),
+                options=options
+            )
 
-        #     if error[0] != QgsVectorFileWriter.NoError:
-        #         print("Error saving layer to GeoPackage:", error[1])
-        #         print(error)
+            if error[0] != QgsVectorFileWriter.NoError:
+                print("Error saving layer to GeoPackage:", error[1])
+                print(error)
     
-        # except Exception as e:
-        #     print("Error QgsVectorFileWriter:", e)
+        except Exception as e:
+            print("Error QgsVectorFileWriter:", e)
         
-        # QgsProject.instance().addMapLayer(layer_centers, False)
+        QgsProject.instance().addMapLayer(layer_centers, False)
         
         # создаем группу и помещаем туда слой
         group = QgsLayerTreeGroup('Гравитационная модель')
@@ -266,8 +266,8 @@ class GravityModelWorker(QThread):
         layer_centers_field = self.dlg_model.comboBox_significance_attr_2.currentText()
         alpha = self.dlg_model.textEdit_significance_power.text()
         beta = self.dlg_model.textEdit_distance_power.text()
-        max_distance_thershold = self.dlg_model.textEdit_max_distance_thershold.text()
-        return layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_thershold
+        max_distance_threshold = self.dlg_model.textEdit_max_distance.text()
+        return layer, layer_centers, layer_field, layer_centers_field, alpha, beta, max_distance_threshold
 
     def get_temp_file_path(plugin_dir, filename):
         temp_dir = os.path.join(plugin_dir, "temp")

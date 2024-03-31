@@ -20,9 +20,12 @@ from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.core import QgsProject, QgsVectorLayer
 from qgis.gui import QgsMapTool
 from qgis.core import QgsMapLayerProxyModel, QgsProject
+from PyQt5.QtWidgets import QMainWindow, QProgressBar
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QPixmap, QImage
 from qgis.PyQt.QtWidgets import QLabel
+from .models.GravityModel import GravityModel
+from qgis.PyQt.QtWidgets import QAction, QDockWidget, QToolButton, QToolBar
 
 class TitleBar(QWidget):
     def __init__(self, parent):
@@ -158,6 +161,13 @@ class Models:
         # Active layer for feature selection
         self.active_layer = None
         self.diagram_window = None
+        
+        # Create a progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        
+        self.init_gravity_model()
 
 
     def set_active_layer(self, layer):
@@ -168,6 +178,7 @@ class Models:
 
     def get_feature_data_from_ids(self, ids):
         pass
+
 
     def create_diagram(self, data):
         if self.active_layer is None:
@@ -342,6 +353,8 @@ class Models:
             
     # работа плагина
     def run(self):
+        self.gravity_model.run()
+        return
         # инициализация базового окна
         if not self.pluginIsActive:
             self.pluginIsActive = True
@@ -363,6 +376,7 @@ class Models:
             
             
     def on_layer_combobox_changed_do_show_layer_attrs(self, layer_cmb, attrs_cmb):
+        return
         layer = layer_cmb.itemData(layer_cmb.currentIndex())
         attributes = [field.name() for field in layer.fields()]
         attrs_cmb.clear()
@@ -376,6 +390,7 @@ class Models:
 
 
     def run_model_dialog(self):
+        return
         model = self.dockwidget.model_comboBox.currentText()
         self.dockwidget.hide()
         self.dlg_model = None
@@ -419,3 +434,20 @@ class Models:
         if worker is not None:
             self.start_model_worker(worker)
 
+# ______________________________________________________________________________________________________
+# ——————————————————————————————————————————————————————————————————————————————————————————————————————
+# ______________________________________________________________________________________________________
+# ——————————————————————————————————————————————————————————————————————————————————————————————————————
+# ______________________________________________________________________________________________________
+# ——————————————————————————————————————————————————————————————————————————————————————————————————————
+
+
+    def init_gravity_model(self):
+        # Create GravityModel instance
+        self.gravity_model = GravityModel(self)
+        
+        # Connect GravityModel's progress signal to update_progress_bar slot
+        self.gravity_model.progress_signal.connect(self.update_progress_bar)
+
+    def update_progress_bar(self, progress):
+        self.progress_bar.setValue(progress)
