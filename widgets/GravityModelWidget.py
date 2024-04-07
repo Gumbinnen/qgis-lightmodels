@@ -11,8 +11,7 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     
-    closingPlugin = pyqtSignal()
-    
+    closing_widget = pyqtSignal()
     configure_signal = pyqtSignal()
     diagram_tool_signal = pyqtSignal()
     start_signal = pyqtSignal()
@@ -58,4 +57,5 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
     def closeEvent(self, event):
         self.disconnect_buttons()
+        self.closing_widget.emit()
         event.accept()
