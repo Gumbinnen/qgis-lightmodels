@@ -23,14 +23,16 @@
 """
 
 import os
-
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import pyqtSignal, Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'gravity_dialog_base.ui'))
+    os.path.dirname(__file__), 'untitled.ui'))
 
 
 class GravityDialog(QtWidgets.QDialog, FORM_CLASS):
@@ -41,6 +43,21 @@ class GravityDialog(QtWidgets.QDialog, FORM_CLASS):
         super(GravityDialog, self).__init__(parent)
         
         self.setupUi(self)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        self.plot_pie_chart()
+
+    def plot_pie_chart(self):
+        # Создаем фигуру для круговой диаграммы
+        fig, ax = plt.subplots()
+        ax.pie([30, 20, 50], labels=['A', 'B', 'C'], autopct='%1.1f%%')
+        ax.set_title('Распределение потребителей среди поставщиков', fontsize=10)
+        
+        # Создаем экземпляр класса FigureCanvas
+        canvas = FigureCanvas(fig)
+        
+        # Добавляем виджет с круговой диаграммой на layout второго Tab
+        self.layout.addWidget(canvas)
 
     def closeEvent(self, event):
         # Добавьте ваш код обработки закрытия диалогового окна здесь
