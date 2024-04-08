@@ -556,58 +556,13 @@ class Models:
                                 xy=(x, y), xytext=(label_x, label_y),
                                 ha='center', va='center', fontsize=10, color='white',
                                 arrowprops=dict(arrowstyle='-', color=colors[i]),
-                                bbox=dict(boxstyle="round,pad=0.2", fc=colors[i], alpha=0.90, edgecolor='none'))
+                                bbox=dict(boxstyle="round,pad=0.2", fc=colors[i], alpha=1.0, edgecolor='none'))
                     
                     annotations.append(annotation)
 
                 for wedge in wedges:
                     wedge.set_edgecolor('white')
                     wedge.set_linewidth(1)
-
-                def highlight(i):
-                    # Reduce alpha for all annotations and wedges
-                    for annotation in annotations:
-                        annotation.set_alpha(0.35)
-                        
-                        # Retrieve the bounding box patch object
-                        bbox_patch = annotation.get_bbox_patch()
-                        r, g, b, _ = bbox_patch.get_facecolor()
-                        bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,0.35), edgecolor='none')
-                        annotation.set_bbox(bbox)
-                        
-                    for wedge in wedges:
-                        wedge.set_alpha(0.35)
-                        wedge.set_linewidth(1)
-                        
-                    current_annotation = annotations[i]
-                    current_wedge = wedges[i]
-                    
-                    # Set alpha to 1 for the clicked annotation and wedge
-                    current_annotation.set_alpha(1)
-                    current_annotation.set_zorder(12)
-                    
-                    bbox_patch = current_annotation.get_bbox_patch()
-                    r, g, b, _ = bbox_patch.get_facecolor()
-                    bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
-                    current_annotation.set_bbox(bbox)
-                    
-                    current_wedge.set_alpha(1)
-                    
-                    # Add white border to the clicked wedge
-                    current_wedge.set_linewidth(2)
-                    plt.draw()
-
-                def is_inside_annotation(annotation, event):
-                    # Get the coordinates of the mouse click event
-                    x_click, y_click = event.x, event.y
-
-                    # Get the bounding box of the annotation
-                    bbox = annotation.get_bbox_patch().get_bbox()
-                    bbox_xmin, bbox_ymin = bbox.xmin, bbox.ymin
-                    bbox_xmax, bbox_ymax = bbox.xmax, bbox.ymax
-
-                    # Check if the mouse click coordinates fall within the bounding box of the annotation
-                    return bbox_xmin <= x_click <= bbox_xmax and bbox_ymin <= y_click <= bbox_ymax
 
                 def onclick(event):
                     edge_highlighed = False
@@ -629,22 +584,41 @@ class Models:
                         for i, wedge in enumerate(wedges):
                             theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
                             
-                            theta1 %= 2*np.pi
-                            theta2 %= 2*np.pi
-                            # Adjust theta2 to be larger than theta1 to ensure proper comparison
-                            if theta2 < theta1:
-                                theta2 += 2 * np.pi
-                            
+                            print(theta1, angle, theta2)
                             if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
                                 edge_highlighed = True
-                                highlight(i)
-                                break  # Exit loop once a wedge is found
-                            else:
+                                # Reduce alpha for all annotations and wedges
                                 for annotation in annotations:
-                                    if is_inside_annotation(annotation, event):
-                                        edge_highlighed = True
-                                        highlight(i)
-                                        break
+                                    annotation.set_alpha(0.35)
+
+                                    # Retrieve the bounding box patch object
+                                    bbox_patch = annotation.get_bbox_patch()
+                                    r, g, b, _ = bbox_patch.get_facecolor()
+                                    bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,0.35), edgecolor='none')
+                                    annotation.set_bbox(bbox)
+
+                                for wedge in wedges:
+                                    wedge.set_alpha(0.35)
+                                    wedge.set_linewidth(1)
+
+                                current_annotation = annotations[i]
+                                current_wedge = wedges[i]
+
+                                # Set alpha to 1 for the clicked annotation and wedge
+                                current_annotation.set_alpha(1)
+                                current_annotation.set_zorder(12)
+
+                                bbox_patch = current_annotation.get_bbox_patch()
+                                r, g, b, _ = bbox_patch.get_facecolor()
+                                bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
+                                current_annotation.set_bbox(bbox)
+
+                                current_wedge.set_alpha(1)
+
+                                # Add white border to the clicked wedge
+                                current_wedge.set_linewidth(2)
+                                plt.draw()
+                                break  # Exit loop once a wedge is found
                             
                     if not edge_highlighed:
                         for annotation in annotations:
