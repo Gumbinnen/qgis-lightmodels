@@ -6,23 +6,13 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>401</width>
-    <height>399</height>
+    <width>400</width>
+    <height>336</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Гравитационная модель</string>
   </property>
-  <widget class="QProgressBar" name="progress_bar">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>370</y>
-     <width>381</width>
-     <height>18</height>
-    </rect>
-   </property>
-  </widget>
   <widget class="QLabel" name="label_significance_attr">
    <property name="geometry">
     <rect>
@@ -44,25 +34,12 @@
     <rect>
      <x>10</x>
      <y>210</y>
-     <width>111</width>
+     <width>113</width>
      <height>20</height>
     </rect>
    </property>
    <property name="text">
     <string>1</string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="textEdit_max_distance_thershold">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>310</y>
-     <width>111</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>40</string>
    </property>
   </widget>
   <widget class="QComboBox" name="comboBox_significance_attr">
@@ -121,7 +98,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>340</y>
+     <y>300</y>
      <width>75</width>
      <height>23</height>
     </rect>
@@ -151,7 +128,7 @@
     <rect>
      <x>10</x>
      <y>260</y>
-     <width>111</width>
+     <width>113</width>
      <height>20</height>
     </rect>
    </property>
@@ -209,32 +186,6 @@
    </property>
    <property name="text">
     <string>Выберите слой поставщиков</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_distance_power_2">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>290</y>
-     <width>274</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Верхний порог расстояния между потребителями и поставщиками</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="cancel_button">
-   <property name="geometry">
-    <rect>
-     <x>100</x>
-     <y>340</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Отмена</string>
    </property>
   </widget>
  </widget>

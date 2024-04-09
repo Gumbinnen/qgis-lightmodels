@@ -23,14 +23,15 @@
 """
 
 import os
-
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import pyqtSignal, Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'gravity_dialog_base.ui'))
+    os.path.dirname(__file__), 'untitled.ui'))
 
 
 class GravityDialog(QtWidgets.QDialog, FORM_CLASS):
@@ -41,6 +42,13 @@ class GravityDialog(QtWidgets.QDialog, FORM_CLASS):
         super(GravityDialog, self).__init__(parent)
         
         self.setupUi(self)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        self.plot_empty_chart()
+
+    def plot_empty_chart(self):
+        canvas = FigureCanvas()
+        self.layout.addWidget(canvas)
 
     def closeEvent(self, event):
         # Добавьте ваш код обработки закрытия диалогового окна здесь
