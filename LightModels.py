@@ -12,7 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from qgis.core import *
 from qgis.core import (
     QgsProject, QgsMapLayer, QgsWkbTypes, QgsVectorLayer, QgsField, QgsFeature, QgsPoint,
-    QgsLayerTreeGroup, QgsLayerTreeLayer, QgsGeometry, QgsGraduatedSymbolRenderer,
+    QgsLayerTreeGroup, QgsLayerTreeLayer, QgsGeometry, QgsGraduatedSymbolRenderer, QgsMessageLog, Qgis,
     QgsFeatureRequest, QgsSpatialIndex, QgsSymbol, QgsCategorizedSymbolRenderer, QgsCoordinateTransformContext,
     QgsSingleSymbolRenderer, QgsMarkerSymbol, QgsRendererCategory, QgsCoordinateReferenceSystem, QgsCoordinateTransform
 )
@@ -325,6 +325,7 @@ class Models:
         headers = ['f']
         for tc in layer_tc.getFeatures():
             headers.append(tc.id())
+        
         data = []
         for f in list(layer.getFeatures()):
             h_dict = {}
@@ -385,12 +386,13 @@ class Models:
         QgsProject.instance().addMapLayer(line_layer, False)
         group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(line_layer))
 
-        with open(f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv', 'w', newline='') as csvfile:
+        gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
+        with open(gm_data_path, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(headers)
             csvwriter.writerows(data)
             
-        with open(f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv', 'r') as csvfile:
+        with open(gm_data_path, 'r') as csvfile:
             csvreader = csv.reader(csvfile)
             data = list(csvreader)
 
@@ -492,29 +494,115 @@ class Models:
 
 
     def on_selection_changed(self):
+        def log(*messages, note:str='', title:str='', tab:str=None, level=Qgis.Info, sep:str=' ') -> None:
+            """Custom log function for Qgis. Combine messages into letter and log.
+            
+            Example:
+                log(myValue, 'Status:', myStatus, note='MyValue:', tab='My Values')
+                
+                if isGood:
+                    log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Success)
+                else:
+                    log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Info)
+                    
+            Example output:
+                INFO MyValue: 200 Status: OK
+                SUCCESS InspectorClass: isGood: True
+
+            Args:
+                note (str, optional): note will appear before letter. Use for variable name when logging values. Defaults to ''.
+                title (str, optional): title will appear first. Use for global information. Defaults to ''.
+                tab (str, optional): If not None, QGIS will create separate log tab with given name. Defaults to ''.
+                level (Qgis.MessageLevel, optional): level of the message. Common levels: Info, Warning, Critical, Success. Defaults to Qgis.Info.
+                sep (str, optional): Default separate character. Defaults to ' '.
+            """
+            empty = ''
+            letter = empty
+            for message in messages:
+                letter += sep + str(message)
+            if title is not empty and note is not empty:
+                title += sep
+            QgsMessageLog.logMessage(title + note + letter, tag=tab, level=level)
+
+
         layer = self.diagram_layer
         files = os.listdir(self.plugin_dir + '/gm_data')
         for file in files:
             if layer.id() == file.split('&')[0]:
                 layer_tc = QgsProject.instance().mapLayer(file.split('&')[1][:-4])
                 break
+            
         if len(list(layer.selectedFeatures())) != 0:
+            
+            log('_______________________________________________________________')
             f_id = list(layer.selectedFeatures())[0].id()
-            with open(f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv', 'r') as csvfile:
+            
+            diagram_field = self.diagram_label_field
+            gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
+            with open(gm_data_path, 'r') as csvfile:
                 csvreader = csv.reader(csvfile)
-                if self.diagram_label_field != None and self.diagram_label_field != 'id':
-                    labels = [layer_tc.getFeature(int(tc_id))[str(self.diagram_label_field)] for tc_id in next(csvreader)[1:]]
+                
+                if diagram_field != None and str(diagram_field) != 'id':
+                    diagram_field = str(diagram_field)
+                    labels = []
+                    
+                    log('if TRUE    ____________________________________')
+                    log(diagram_field, note='diagram field:')
+                    
+                    log('________loop_start________')
+                    for tc_id in next(csvreader)[1:]:
+                        feature = layer_tc.getFeature(int(tc_id))
+                        labels.append(feature[diagram_field])
+                        
+                        log(feature[diagram_field], note='feature[diagram_field]:')
+                        
+                    log('________loop_start________')
+                    log(labels, note='labels:')
+                    log('if TRUE END____________________________________')
                 else:
+                    
+                    log('if FALSE    ______________________________')
+                    log(diagram_field, note='diagram field:')
+                    
                     labels = next(csvreader)[1:]
+                    log(labels, note='labels')
+                    log('if FALSE END______________________________')
+                    
+                log('________row loop start________')    
                 for row in csvreader:
                     if row[0] == str(f_id):
                         values = list(map(float, row[1:]))
+                        log(values, note='values')
                         break
-
+                log('________row loop end  ________')
+                
             my_dict = {}
+            log('________zip(labels, values)_loop_start________')
             for label, value in zip(labels, values):
+                log(label, value, note='label, value:')
+                
+                # Здесь вероятности складываются, если ключи `labels` повторяются!
+                #
+                if label in my_dict:
+                    my_dict[label] += float(value)
+                    continue
+
                 my_dict[label] = value
             my_dict = {key: value for key, value in my_dict.items() if float(value) != 0}
+            log('________zip(labels, values)_loop_end  ________')
+            log('my_dict:', my_dict)
+            
+            initial_len = len(list(zip(labels, values)))
+            dict_len = len(list(my_dict.keys()))
+            log('initial_len:',initial_len, 'dict_len:',dict_len)
+            
+            if dict_len != initial_len:
+                log('__________not equal    __________')
+                
+                for key in list(my_dict.keys()):
+                    log(key, note='key:')
+                
+                log('__________not equal end__________')
             
             if len(my_dict) > 10:
                 sorted_dict = dict(sorted(my_dict.items(), key=lambda x: x[1], reverse=True))
@@ -523,7 +611,7 @@ class Models:
                 top_n['др.'] = other_sum
                 my_dict = top_n
 
-            if len(my_dict) != 0:
+            if len(my_dict) != 0:                
                 colors = plt.cm.tab10(np.arange(len(my_dict)))
                 
                 fig, ax = plt.subplots()
@@ -584,7 +672,6 @@ class Models:
                         for i, wedge in enumerate(wedges):
                             theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
                             
-                            print(theta1, angle, theta2)
                             if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
                                 edge_highlighed = True
                                 # Reduce alpha for all annotations and wedges
