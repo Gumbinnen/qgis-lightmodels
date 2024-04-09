@@ -599,7 +599,7 @@ class Models:
             if dict_len != initial_len:
                 log('__________not equal    __________')
                 
-                for key in list(my_dict.keys()):
+                for key in list(my_dict.keys()): # !!!!!!!!!!!
                     log(key, note='key:')
                 
                 log('__________not equal end__________')
@@ -638,7 +638,9 @@ class Models:
                     label_y = 1.5 * np.sin(angle_rad)  # Adjust the position of the label along y-axis
 
                     percent = my_dict[category]*100
-                    value = list(my_dict.keys())[i]
+                    value = str(list(my_dict.keys())[i])
+                    if len(value) > 19:
+                        value = value[:18]+'…'
                     
                     annotation = ax.annotate('{:.1f}%\n{}'.format(percent, value),
                                 xy=(x, y), xytext=(label_x, label_y),
