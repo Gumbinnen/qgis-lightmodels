@@ -31,7 +31,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'untitled.ui'))
+    os.path.dirname(__file__), 'res', 'ui', 'untitled.ui'))
 
 
 class GravityDialog(QtWidgets.QDialog, FORM_CLASS):
