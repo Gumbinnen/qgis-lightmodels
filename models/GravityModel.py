@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QInputDialog, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QInputDialog, QMessageBox, QDockWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from lightmodels.widgets.GravityModelWidget import GravityModelWidget
 from lightmodels.widgets.GravityModelConfigWidget import GravityModelConfigWidget
@@ -81,7 +81,7 @@ class GravityModel(QObject):
 
     def run(self):
         self.gravity_widget.run()
-        self.config_widget.run()
+        # self.config_widget.run() # Start config widget automatically?
         
     def start(self):
         def log(message, *text:str):
