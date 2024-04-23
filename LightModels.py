@@ -25,7 +25,6 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import csv
 import os
 import math
 
@@ -244,12 +243,15 @@ class Models:
                 self.dlg_model.comboBox_feature_layer_2.addItem(layer.name(), layer)
         self.dlg_model.comboBox_feature_layer.setCurrentIndex(-1)
         self.dlg_model.comboBox_feature_layer_2.setCurrentIndex(-1)
+        
         self.dlg_model.comboBox_feature_layer.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed(self.dlg_model.comboBox_feature_layer, self.dlg_model.comboBox_significance_attr))
         self.dlg_model.comboBox_feature_layer_2.currentIndexChanged.connect(lambda: self.on_layer_combobox_changed(self.dlg_model.comboBox_feature_layer_2, self.dlg_model.comboBox_significance_attr_2))
+        
         self.dlg_model.tabWidget.currentChanged.connect(self.on_change_tab)
         self.dlg_model.closingDialog.connect(self.onCloseGravityDialog)
         self.dlg_model.ok_button.clicked.connect(self.run_gravity_model)
         self.dlg_model.export_button.clicked.connect(self.on_export_click)
+        
         self.dlg_model.show()
 
 
