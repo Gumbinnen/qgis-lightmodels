@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time 
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import os
 import math
@@ -256,7 +257,7 @@ class Models:
 
 
     def run_gravity_model(self):
-        def calculate_distance_in_meters(f1, f2):     
+        def calculate_distance_in_meters(f1, f2):
             EARTH_RADIUS = 6371
             
             lat1, lon1 = f1
@@ -276,7 +277,7 @@ class Models:
             distance_meters = distance * 1000
 
             return distance_meters
-        
+
         # получение данных из формы
         layer_attr = self.dlg_model.comboBox_significance_attr.currentText()
         layer_tc_attr = self.dlg_model.comboBox_significance_attr_2.currentText()
@@ -442,7 +443,7 @@ class Models:
 
 
     def run_diagrams(self):
-        self.iface.actionSelect().trigger()
+        self.iface.actionSelect().trigger() # Click on select tool
         self.diagram_label_field = None
         self.on_active_layer_changed()
         iface.currentLayerChanged.connect(self.on_active_layer_changed)
@@ -534,213 +535,200 @@ class Models:
                 layer_tc = QgsProject.instance().mapLayer(file.split('&')[1][:-4])
                 break
             
-        if len(list(layer.selectedFeatures())) != 0:
+        if len(list(layer.selectedFeatures())) == 0:
+            return
             
-            log('_______________________________________________________________')
-            f_id = list(layer.selectedFeatures())[0].id()
+        log('_______________________________________________________________')
+        f_id = list(layer.selectedFeatures())[0].id()
+        
+        diagram_field = self.diagram_label_field
+        gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
+        with open(gm_data_path, 'r') as csvfile:
+            csvreader = csv.reader(csvfile)
             
-            diagram_field = self.diagram_label_field
-            gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
-            with open(gm_data_path, 'r') as csvfile:
-                csvreader = csv.reader(csvfile)
+            if diagram_field != None and str(diagram_field) != 'id':
+                diagram_field = str(diagram_field)
+                labels = []
                 
-                if diagram_field != None and str(diagram_field) != 'id':
-                    diagram_field = str(diagram_field)
-                    labels = []
-                    
-                    log('if TRUE    ____________________________________')
-                    log(diagram_field, note='diagram field:')
-                    
-                    log('________loop_start________')
-                    for tc_id in next(csvreader)[1:]:
-                        feature = layer_tc.getFeature(int(tc_id))
-                        labels.append(feature[diagram_field])
-                        
-                        log(feature[diagram_field], note='feature[diagram_field]:')
-                        
-                    log('________loop_start________')
-                    log(labels, note='labels:')
-                    log('if TRUE END____________________________________')
-                else:
-                    
-                    log('if FALSE    ______________________________')
-                    log(diagram_field, note='diagram field:')
-                    
-                    labels = next(csvreader)[1:]
-                    log(labels, note='labels')
-                    log('if FALSE END______________________________')
-                    
-                log('________row loop start________')    
-                for row in csvreader:
-                    if row[0] == str(f_id):
-                        values = list(map(float, row[1:]))
-                        log(values, note='values')
-                        break
-                log('________row loop end  ________')
+                log('if TRUE    ____________________________________')
+                log(diagram_field, note='diagram field:')
                 
-            my_dict = {}
-            log('________zip(labels, values)_loop_start________')
-            for label, value in zip(labels, values):
-                log(label, value, note='label, value:')
+                log('________loop_start________')
+                for tc_id in next(csvreader)[1:]:
+                    feature = layer_tc.getFeature(int(tc_id))
+                    labels.append(feature[diagram_field])
+                    
+                    log(feature[diagram_field], note='feature[diagram_field]:')
+                    
+                log('________loop_start________')
+                log(labels, note='labels:')
+                log('if TRUE END____________________________________')
+            else:
                 
-                # Здесь вероятности складываются, если ключи `labels` повторяются!
-                #
-                if label in my_dict:
-                    my_dict[label] += float(value)
-                    continue
-
-                my_dict[label] = value
-            my_dict = {key: value for key, value in my_dict.items() if float(value) != 0}
-            log('________zip(labels, values)_loop_end  ________')
-            log('my_dict:', my_dict)
+                log('if FALSE    ______________________________')
+                log(diagram_field, note='diagram field:')
+                
+                labels = next(csvreader)[1:]
+                log(labels, note='labels')
+                log('if FALSE END______________________________')
+                    
+            log('________row loop start________')    
+            for row in csvreader:
+                if row[0] == str(f_id):
+                    values = list(map(float, row[1:]))
+                    log(values, note='values')
+                    break
+            log('________row loop end  ________')
             
-            initial_len = len(list(zip(labels, values)))
-            dict_len = len(list(my_dict.keys()))
-            log('initial_len:',initial_len, 'dict_len:',dict_len)
+        my_dict = {}
+        log('________zip(labels, values)_loop_start________')
+        for label, value in zip(labels, values):
+            log(label, value, note='label, value:')
             
-            if dict_len != initial_len:
-                log('__________not equal    __________')
-                
-                for key in list(my_dict.keys()): # !!!!!!!!!!!
-                    log(key, note='key:')
-                
-                log('__________not equal end__________')
+            # Здесь вероятности складываются, если ключи `labels` повторяются!
+            #
+            if label in my_dict:
+                my_dict[label] += float(value)
+                continue
             
-            if len(my_dict) > 10:
-                sorted_dict = dict(sorted(my_dict.items(), key=lambda x: x[1], reverse=True))
-                top_n = dict(itertools.islice(sorted_dict.items(), 9))
-                other_sum = sum(my_dict.values()) - sum(top_n.values())
-                top_n['др.'] = other_sum
-                my_dict = top_n
+            my_dict[label] = value
+        
+        my_dict = {key: value for key, value in my_dict.items() if float(value) != 0}
+        log('________zip(labels, values)_loop_end  ________')
+        log('my_dict:', my_dict)
+        
+        initial_len = len(list(zip(labels, values)))
+        dict_len = len(list(my_dict.keys()))
+        log('initial_len:',initial_len, 'dict_len:',dict_len)
+        
+        if dict_len != initial_len:
+            log('__________not equal    __________')
+            
+            for key in list(my_dict.keys()): # !!!!!!!!!!!
+                log(key, note='key:')
+            
+            log('__________not equal end__________')
+            
+        if len(my_dict) > 10:
+            sorted_dict = dict(sorted(my_dict.items(), key=lambda x: x[1], reverse=True))
+            top_n = dict(itertools.islice(sorted_dict.items(), 9))
+            other_sum = sum(my_dict.values()) - sum(top_n.values())
+            top_n['др.'] = other_sum
+            my_dict = top_n
+        
+        if len(my_dict) == 0:
+            return
 
-            if len(my_dict) != 0:                
-                colors = plt.cm.tab10(np.arange(len(my_dict)))
-                
-                fig, ax = plt.subplots()
-                ax.set_title('Распределение потребителей среди поставщиков', fontsize=10, pad=40)
-                
-                pie = ax.pie(my_dict.values(), startangle=90)
-                
-                centre_circle = plt.Circle((0, 0), 0.50, color='white', fc='white', linewidth=0)
-                ax.add_artist(centre_circle)
-                
-                annotations = []
-                wedges = pie[0]
-                for i, (category, value) in enumerate(my_dict.items()):
-                    angle = pie[0][i].theta1  # Start angle of the slice
-                    angle += (pie[0][i].theta2 - pie[0][i].theta1) / 2 # Mid-angle of the slice
-                    angle_rad = np.deg2rad(angle)
-                    radius = 1.1  # Adjust this value to control the length of the lines
-                
-                    x = radius * np.cos(angle_rad)
-                    y = radius * np.sin(angle_rad)
+        colors = plt.cm.tab10(np.arange(len(my_dict)))
+        
+        fig, ax = plt.subplots()
+        ax.set_title('Распределение потребителей среди поставщиков', fontsize=10, pad=40)
+        
+        pie = ax.pie(my_dict.values(), startangle=90)
+        
+        centre_circle = plt.Circle((0, 0), 0.50, color='white', fc='white', linewidth=0)
+        ax.add_artist(centre_circle)
+        
+        annotations = []
+        wedges = pie[0]
+        for i, (category, value) in enumerate(my_dict.items()):
+            angle = pie[0][i].theta1  # Start angle of the slice
+            angle += (pie[0][i].theta2 - pie[0][i].theta1) / 2 # Mid-angle of the slice
+            angle_rad = np.deg2rad(angle)
+            radius = 1.1  # Adjust this value to control the length of the lines
+        
+            x = radius * np.cos(angle_rad)
+            y = radius * np.sin(angle_rad)
+            
+            # Adjust percentage labels
+            label_x = 1.5 * np.cos(angle_rad)  # Adjust the position of the label along x-axis
+            label_y = 1.5 * np.sin(angle_rad)  # Adjust the position of the label along y-axis
+            percent = my_dict[category]*100
+            value = str(list(my_dict.keys())[i])
+            if len(value) > 19:
+                value = value[:18]+'…'
+            
+            annotation = ax.annotate('{:.1f}%\n{}'.format(percent, value),
+                        xy=(x, y), xytext=(label_x, label_y),
+                        ha='center', va='center', fontsize=10, color='white',
+                        arrowprops=dict(arrowstyle='-', color=colors[i]),
+                        bbox=dict(boxstyle="round,pad=0.2", fc=colors[i], alpha=1.0, edgecolor='none'))
+            
+            annotations.append(annotation)
+        for wedge in wedges:
+            wedge.set_edgecolor('white')
+            wedge.set_linewidth(1)
+            
+        def onclick(event):
+            edge_highlighed = False
+            if event.inaxes == ax:
+                center = (0, 0)  # Center of the pie chart
+                x, y = event.xdata, event.ydata  # Coordinates of the click event
+                # # Calculate the angle of the click event relative to the center of the pie chart
+                angle = np.arctan2(y - center[1], x - center[0])
+                # Calculate the angle of the click relative to the starting angle
+                angle %= 2*np.pi  # Ensure angle is within [0, 360] degrees
+                if (0 <= angle <= np.pi/2):
+                    angle += 2*np.pi
+                # Calculate the distance between the click event and the center of the pie chart
+                distance = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+                # Iterate over the wedges and check if the click event falls within the boundaries of each wedge
+                for i, wedge in enumerate(wedges):
+                    theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
                     
-                    # Adjust percentage labels
-                    label_x = 1.5 * np.cos(angle_rad)  # Adjust the position of the label along x-axis
-                    label_y = 1.5 * np.sin(angle_rad)  # Adjust the position of the label along y-axis
-
-                    percent = my_dict[category]*100
-                    value = str(list(my_dict.keys())[i])
-                    if len(value) > 19:
-                        value = value[:18]+'…'
-                    
-                    annotation = ax.annotate('{:.1f}%\n{}'.format(percent, value),
-                                xy=(x, y), xytext=(label_x, label_y),
-                                ha='center', va='center', fontsize=10, color='white',
-                                arrowprops=dict(arrowstyle='-', color=colors[i]),
-                                bbox=dict(boxstyle="round,pad=0.2", fc=colors[i], alpha=1.0, edgecolor='none'))
-                    
-                    annotations.append(annotation)
-
-                for wedge in wedges:
-                    wedge.set_edgecolor('white')
-                    wedge.set_linewidth(1)
-
-                def onclick(event):
-                    edge_highlighed = False
-                    if event.inaxes == ax:
-                        center = (0, 0)  # Center of the pie chart
-                        x, y = event.xdata, event.ydata  # Coordinates of the click event
-
-                        # # Calculate the angle of the click event relative to the center of the pie chart
-                        angle = np.arctan2(y - center[1], x - center[0])
-
-                        # Calculate the angle of the click relative to the starting angle
-                        angle %= 2*np.pi  # Ensure angle is within [0, 360] degrees
-                        if (0 <= angle <= np.pi/2):
-                            angle += 2*np.pi
-
-                        # Calculate the distance between the click event and the center of the pie chart
-                        distance = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                        # Iterate over the wedges and check if the click event falls within the boundaries of each wedge
-                        for i, wedge in enumerate(wedges):
-                            theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
-                            
-                            if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
-                                edge_highlighed = True
-                                # Reduce alpha for all annotations and wedges
-                                for annotation in annotations:
-                                    annotation.set_alpha(0.35)
-
-                                    # Retrieve the bounding box patch object
-                                    bbox_patch = annotation.get_bbox_patch()
-                                    r, g, b, _ = bbox_patch.get_facecolor()
-                                    bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,0.35), edgecolor='none')
-                                    annotation.set_bbox(bbox)
-
-                                for wedge in wedges:
-                                    wedge.set_alpha(0.35)
-                                    wedge.set_linewidth(1)
-
-                                current_annotation = annotations[i]
-                                current_wedge = wedges[i]
-
-                                # Set alpha to 1 for the clicked annotation and wedge
-                                current_annotation.set_alpha(1)
-                                current_annotation.set_zorder(12)
-
-                                bbox_patch = current_annotation.get_bbox_patch()
-                                r, g, b, _ = bbox_patch.get_facecolor()
-                                bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
-                                current_annotation.set_bbox(bbox)
-
-                                current_wedge.set_alpha(1)
-
-                                # Add white border to the clicked wedge
-                                current_wedge.set_linewidth(2)
-                                plt.draw()
-                                break  # Exit loop once a wedge is found
-                            
-                    if not edge_highlighed:
+                    if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
+                        edge_highlighed = True
+                        # Reduce alpha for all annotations and wedges
                         for annotation in annotations:
-                            annotation.set_alpha(1)
+                            annotation.set_alpha(0.35)
                             # Retrieve the bounding box patch object
                             bbox_patch = annotation.get_bbox_patch()
                             r, g, b, _ = bbox_patch.get_facecolor()
-                        
-                            bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
+                            bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,0.35), edgecolor='none')
                             annotation.set_bbox(bbox)
-                            
                         for wedge in wedges:
-                            wedge.set_alpha(1)
+                            wedge.set_alpha(0.35)
                             wedge.set_linewidth(1)
-
+                        current_annotation = annotations[i]
+                        current_wedge = wedges[i]
+                        # Set alpha to 1 for the clicked annotation and wedge
+                        current_annotation.set_alpha(1)
+                        current_annotation.set_zorder(12)
+                        bbox_patch = current_annotation.get_bbox_patch()
+                        r, g, b, _ = bbox_patch.get_facecolor()
+                        bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
+                        current_annotation.set_bbox(bbox)
+                        current_wedge.set_alpha(1)
+                        # Add white border to the clicked wedge
+                        current_wedge.set_linewidth(2)
                         plt.draw()
-
-                fig.canvas.mpl_connect('button_press_event', onclick)
-                
-                fig.subplots_adjust(top=0.77, bottom=0.15, left=0.0, right=1)
-                
-                self.dlg_model.layout.takeAt(0).widget().deleteLater()
-                
-                canvas = FigureCanvas(fig)
-                self.dlg_model.layout.addWidget(canvas)
-
-                # выделение линий от потребителя к поставщикам
-                line_layer = QgsProject.instance().mapLayersByName('линии [g. m.]')[0]
-                request = QgsFeatureRequest().setFilterExpression(f'{"f_id"} = {f_id}')
-                need_line_ids = [line.id() for line in line_layer.getFeatures(request)]
-                line_layer.selectByIds(need_line_ids)
+                        break  # Exit loop once a wedge is found
+                        
+            if not edge_highlighed:
+                for annotation in annotations:
+                    annotation.set_alpha(1)
+                    # Retrieve the bounding box patch object
+                    bbox_patch = annotation.get_bbox_patch()
+                    r, g, b, _ = bbox_patch.get_facecolor()
+                    bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
+                    annotation.set_bbox(bbox)
+                for wedge in wedges:
+                    wedge.set_alpha(1)
+                    wedge.set_linewidth(1)
+                plt.draw()
+        
+        fig.canvas.mpl_connect('button_press_event', onclick)
+        
+        fig.subplots_adjust(top=0.77, bottom=0.15, left=0.0, right=1)
+            
+        self.dlg_model.layout.takeAt(0).widget().deleteLater()
+        canvas = FigureCanvas(fig)
+        self.dlg_model.layout.addWidget(canvas)
+        # выделение линий от потребителя к поставщикам
+        line_layer = QgsProject.instance().mapLayersByName('линии [g. m.]')[0]
+        request = QgsFeatureRequest().setFilterExpression(f'{"f_id"} = {f_id}')
+        need_line_ids = [line.id() for line in line_layer.getFeatures(request)]
+        line_layer.selectByIds(need_line_ids)
 
     # --------------------------------------------------------------------------
     """Модель центральных мест"""

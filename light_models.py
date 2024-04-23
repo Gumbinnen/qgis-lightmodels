@@ -163,5 +163,3 @@ class Models:
     def run_gravity_model(self):
         self.gravity_model = GravityModel(self)
         self.gravity_model.run()
-
-        
