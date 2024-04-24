@@ -445,6 +445,7 @@ class Models:
     def run_diagrams(self):
         self.iface.actionSelect().trigger() # Click on select tool
         self.diagram_label_field = None
+        
         self.on_active_layer_changed()
         iface.currentLayerChanged.connect(self.on_active_layer_changed)
         self.dlg_model.comboBox.currentIndexChanged.connect(self.on_diagram_combobox_change)
@@ -474,6 +475,7 @@ class Models:
         if found:
             self.diagram_layer = layer
             layer.selectionChanged.connect(self.on_selection_changed)
+            
             attributes = ['id']
             attributes += [field.name() for field in layer_tc.fields()]
             self.dlg_model.comboBox.clear()
@@ -538,8 +540,13 @@ class Models:
         if len(list(layer.selectedFeatures())) == 0:
             return
             
-        log('_______________________________________________________________')
+            
+            
+            
         f_id = list(layer.selectedFeatures())[0].id()
+        
+        
+        
         
         diagram_field = self.diagram_label_field
         gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
@@ -549,44 +556,23 @@ class Models:
             if diagram_field != None and str(diagram_field) != 'id':
                 diagram_field = str(diagram_field)
                 labels = []
-                
-                log('if TRUE    ____________________________________')
-                log(diagram_field, note='diagram field:')
-                
-                log('________loop_start________')
                 for tc_id in next(csvreader)[1:]:
                     feature = layer_tc.getFeature(int(tc_id))
                     labels.append(feature[diagram_field])
-                    
-                    log(feature[diagram_field], note='feature[diagram_field]:')
-                    
-                log('________loop_start________')
-                log(labels, note='labels:')
-                log('if TRUE END____________________________________')
             else:
-                
-                log('if FALSE    ______________________________')
-                log(diagram_field, note='diagram field:')
-                
                 labels = next(csvreader)[1:]
-                log(labels, note='labels')
-                log('if FALSE END______________________________')
-                    
-            log('________row loop start________')    
+                     
             for row in csvreader:
                 if row[0] == str(f_id):
                     values = list(map(float, row[1:]))
-                    log(values, note='values')
                     break
-            log('________row loop end  ________')
             
         my_dict = {}
-        log('________zip(labels, values)_loop_start________')
         for label, value in zip(labels, values):
-            log(label, value, note='label, value:')
             
             # Здесь вероятности складываются, если ключи `labels` повторяются!
             #
+            # TODO: словарь должен быть относитеьно id точки, а не лейбла
             if label in my_dict:
                 my_dict[label] += float(value)
                 continue
@@ -594,20 +580,8 @@ class Models:
             my_dict[label] = value
         
         my_dict = {key: value for key, value in my_dict.items() if float(value) != 0}
-        log('________zip(labels, values)_loop_end  ________')
-        log('my_dict:', my_dict)
-        
-        initial_len = len(list(zip(labels, values)))
-        dict_len = len(list(my_dict.keys()))
-        log('initial_len:',initial_len, 'dict_len:',dict_len)
-        
-        if dict_len != initial_len:
-            log('__________not equal    __________')
+
             
-            for key in list(my_dict.keys()): # !!!!!!!!!!!
-                log(key, note='key:')
-            
-            log('__________not equal end__________')
             
         if len(my_dict) > 10:
             sorted_dict = dict(sorted(my_dict.items(), key=lambda x: x[1], reverse=True))

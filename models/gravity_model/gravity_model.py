@@ -15,13 +15,15 @@ import uuid
 from qgis.core import QgsApplication, QgsTask, Qgis, QgsMessageLog
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
-from models.gravity_model import GravityModelWidget
+from models.gravity_model import (
+    GravityModelWidget, LayerEventHandler, GravityModelDataManager,
+    GravityModelDiagramManager, GravityModelConfig as Config
+)
 import os
 import re
 import json
 import math
 import csv
-from gravity_model_config import GravityModelConfig as Config
 from helpers.logger import logger as log
 
 
@@ -33,6 +35,9 @@ class GravityModel(QObject):
         
         self.ui_widget = None
         self.config = Config()
+        self.data_manager = GravityModelDataManager(self)
+        self.diagram_manager = GravityModelDiagramManager()
+        self.layer_event_handler = None
         
         self.init_ui()
         
@@ -40,13 +45,29 @@ class GravityModel(QObject):
         self.ui_widget = GravityModelWidget(self)
         self.ui_widget.ready.connect(self.go)
         
+        self.layer_event_handler = LayerEventHandler(self)
+        self.layer_event_handler.feature_selection.connect(self.feature_selection)
+        
     def run(self):
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
     
+    def feature_selection(self):
+        layer = self.iface.activeLayer()
+        selection_ids = layer.selectedFeatureIds()
+        
+        if len(selection_ids) == 0:
+            return
+        
+        # Берём id первой точки из выбранных
+        f_id = selection_ids[0]
+        
+        # Create my_dict based on f_id: create_dict(f_id)
+        
+        
+    
     def go(self, input_data):
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
-        GRAVITY_MODEL_DATA_PATH = os.path.join(self.plugin_dir, 'temp', 'gm_data')
         
         def calculate_distance_in_meters(f1, f2):
             EARTH_RADIUS = 6371
@@ -183,28 +204,19 @@ class GravityModel(QObject):
         line_layer.setOpacity(0.5)
         QgsProject.instance().addMapLayer(line_layer, False)
         group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(line_layer))
-
-        data_file_name = f'{layer.id()}&{layer_tc.id()}.csv'
-        gm_data_path = os.path.join(GRAVITY_MODEL_DATA_PATH, data_file_name)
         
-        with open(gm_data_path, 'w', newline='') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(headers)
-            csvwriter.writerows(data)
-        
-        # С этого момента данные берём из только что созданного .csv файлы
-        with open(gm_data_path, 'r') as csvfile:
-            csvreader = csv.reader(csvfile)
-            data = list(csvreader)
+        # Записываем данные в .csv файл
+        gm_data_path = self.data_manager.create_file(layer, layer_tc)
+        self.data_manager.write(gm_data_path, data=data, headers=headers)
 
-        # Получаем заголовки
-        headers = data[0]
+        # Получаем данные и заголовки из файла
+        data, headers = self.data_manager.read(gm_data_path, contains_headers=True)
 
         # Проходим по всем столбцам начиная со второго
         layer_tc.startEditing()
         for col_index in range(1, len(headers)):
             tc_id = int(headers[col_index])
-            column_sum = sum(float(row[col_index]) for row in data[1:])
+            column_sum = sum(float(row[col_index]) for row in data)
             
             tc = layer_tc.getFeature(tc_id)
             tc[WEIGHT_FIELD_NAME] = int(column_sum)
