@@ -529,7 +529,6 @@ class Models:
                 title += sep
             QgsMessageLog.logMessage(title + note + letter, tag=tab, level=level)
 
-
         layer = self.diagram_layer
         files = os.listdir(self.plugin_dir + '/gm_data')
         for file in files:
@@ -538,15 +537,9 @@ class Models:
                 break
             
         if len(list(layer.selectedFeatures())) == 0:
-            return
-            
-            
-            
+            return            
             
         f_id = list(layer.selectedFeatures())[0].id()
-        
-        
-        
         
         diagram_field = self.diagram_label_field
         gm_data_path = f'{self.plugin_dir}/gm_data/{layer.id()}&{layer_tc.id()}.csv'
@@ -566,7 +559,11 @@ class Models:
                 if row[0] == str(f_id):
                     values = list(map(float, row[1:]))
                     break
-            
+            # label: 
+            # label => feature[field] == value
+            # example:
+            # 1,2,3,4 (ids)
+            # 200, 4000, 8000 (sizes)
         my_dict = {}
         for label, value in zip(labels, values):
             
@@ -581,8 +578,6 @@ class Models:
         
         my_dict = {key: value for key, value in my_dict.items() if float(value) != 0}
 
-            
-            
         if len(my_dict) > 10:
             sorted_dict = dict(sorted(my_dict.items(), key=lambda x: x[1], reverse=True))
             top_n = dict(itertools.islice(sorted_dict.items(), 9))

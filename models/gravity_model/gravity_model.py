@@ -36,7 +36,7 @@ class GravityModel(QObject):
         self.ui_widget = None
         self.config = Config()
         self.data_manager = GravityModelDataManager(self)
-        self.diagram_manager = GravityModelDiagramManager()
+        self.diagram_manager = GravityModelDiagramManager(self)
         self.layer_event_handler = None
         
         self.init_ui()
@@ -56,15 +56,44 @@ class GravityModel(QObject):
         layer = self.iface.activeLayer()
         selection_ids = layer.selectedFeatureIds()
         
-        if len(selection_ids) == 0:
+        if len(selection_ids) <= 0:
             return
         
         # Берём id первой точки из выбранных
         f_id = selection_ids[0]
         
-        # Create my_dict based on f_id: create_dict(f_id)
+        layer_centers = self.data_manager.get_second_layer(layer)
+        if layer_centers == None:
+            return
         
+        data_path = self.data_manager.get_data_path_if_exists(layer, layer_centers)
+        if data_path == None:
+            return
         
+        #           f_probability_values
+        center_ids, f_prob_values = self.data_manager.get_gravity_values_by_feature_id(data_path, f_id)
+        
+        center_values = []        
+        diagram_field = self.diagram_manager.selected_field
+        if diagram_field != None and not is_id_field(diagram_field): # is_id_field() for `id object`???
+            for center in layer_centers.getFeatures():
+                center_values.append(center[diagram_field])
+
+        # Diagram data is dict where each value is dict:
+        # center_id — ID центральной точки
+        # c_value — Значение атрибута центральной точки. Атрибут выбран в diagram_field
+        # f_prob_value — Значение вероятности, полученное в результате работы гравитационной модели
+        diagram_data = {}
+        for c_id, c_value, f_prob_value in zip(center_ids, center_values, f_prob_values):
+            if float(f_prob_value) != 0:
+                diagram_data[c_id] = {c_value: f_prob_value}
+        
+        # TODO: Список выбранных полей, вместо простого self.diagram_field
+        # TODO: Выбор поля для универсальной идентификации? Если да, то центры, обладающие одинаковым полем идентификации,
+        # считаются как один, и их данные по вероятностям складываются?
+        #
+        
+        self.diagram_manager.construct_diagram(diagram_data) # rename?
     
     def go(self, input_data):
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'

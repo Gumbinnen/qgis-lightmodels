@@ -239,7 +239,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="cmb_field">
+        <widget class="QComboBox" name="cmbox_field">
          <property name="maximumSize">
           <size>
            <width>150</width>

@@ -27,6 +27,7 @@ LAYER_CMBOX_NAME = {
 
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
+    diagram_field_selected = pyqtSignal(str)
     
     def __init__(self, parent=None):
         super(GravityModelWidget, self).__init__()
@@ -45,6 +46,9 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # Фильтрация слоёв в cmbox
         self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer | QgsMapLayerProxyModel.Visible)
         self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer | QgsMapLayerProxyModel.Visible)
+        
+        self.cmbox_field.currentTextChanged.connect(
+            lambda field_name: self.diagram_field_selected.emit(field_name))
         
         self.btn_ok.clicked.connect(self.ok)
         
