@@ -3,24 +3,23 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import numpy as np
 
+# TODO: USE FIELDS / PROPERTIES INSTEAD OF CONSTANS?
+AX_TITLE_PARAMS = dict(fontsize=10, pad=40)
+                            
+PIE_WEDGE_PROPS = dict(width=0.5, edgecolor='white', linewidth=1)
+PIE_PARAMS = dict(wedgeprops=PIE_WEDGE_PROPS, startangle = 0)
 
+ANNOTATION_TEXT_FORMAT = ' '.join(['{}: {}\n', '{}: {}\n', '{:.1f}%'])
+ANNOTATION_PARAMS = dict(arrowprops=dict(arrowstyle='-'),
+                         bbox=dict(boxstyle='round,pad=0.3', edgecolor='None', fc="w", ec="k", lw=0.72),
+                         zorder=0, va='center')
+
+SUBPLOT_ADJUSTMENT = dict(top=0.77, bottom=0.15, left=0.0, right=1)
+
+ON_CLICK_STYLE_PARAMS = dict(alpha=0.35, linewidth=1, zorder=1, accent_alpha=0.35, accent_linewidth=2, accent_zorder=2)
 
 class GravityModelDiagramManager:
-    def __init__(self, parent=None):
-        # TODO: USE FIELDS / PROPERTIES INSTEAD OF CONSTANS?
-        AX_TITLE_PARAMS = dict(fontsize=10, pad=40)
-
-        PIE_WEDGE_PROPS = dict(width=0.5, edgecolor='white', linewidth=1)
-        PIE_PARAMS = dict(wedgeprops=PIE_WEDGE_PROPS, startangle = 0)
-
-        ANNOTATION_TEXT_FORMAT = ' '.join(['{}: {}\n', '{}: {}\n', '{:.1f}%'])
-        ANNOTATION_PARAMS = dict(arrowprops=dict(arrowstyle='-'),
-                                 bbox=dict(boxstyle="square,pad=0.3",
-                                           fc="w", ec="k", lw=0.72),
-                                 zorder=0, va='center')
-
-        SUBPLOT_ADJUSTMENT = dict(top=0.77, bottom=0.15, left=0.0, right=1)
-        
+    def __init__(self, parent=None):        
         self._selected_field = None
         
         self.ui_widget = parent.ui_widget
@@ -37,61 +36,80 @@ class GravityModelDiagramManager:
         self.ui_widget.diagram_layout.takeAt(0).widget().deleteLater()
         self.ui_widget.diagram_layout.addWidget(diagram_canvas)
 
-    def construct_pie(self, diagram_data):        
+    def construct_pie(self, diagram_data):
         def percentage(part, whole):
             return 100*float(part)/float(whole)
+                
+        # TODO: rewrite
+        def update_annotations_and_wedges(wedge_index, wedges, annotations,
+                                          alpha, linewidth, zorder,
+                                          disregard_alpha, accent_linewidth, accent_order):
+            
+            wedge_style_params = dict(alpha=alpha, linewidth=linewidth)
+            annotation_style_params = dict(alpha=alpha, zorder=zorder)
+            bbox_alpha = alpha
+            
+            if wedge_index is not None:
+                wedge_style_params = dict(alpha=disregard_alpha, linewidth=linewidth)
+                annotation_style_params = dict(alpha=disregard_alpha, zorder=zorder)
+                bbox_alpha = disregard_alpha
+            
+            
+            # Стандартные параметры аннотаций (alpha, linewidth, zorder)
+            for annotation in annotations:
+                annotation.set(**annotation_style_params)
+                # Updata annotation alpha
+                bbox = annotation.get_bbox_patch()
+                r, g, b, _ = bbox.get_facecolor()
+                bbox.set_facecolor((r, g, b, bbox_alpha))
+                accent_annotation.set_bbox(bbox)
+            for wedge in wedges:
+                wedge.set(**wedge_style_params)
+            
+            # Если индекс существует, изменить долю и соответсвующую аннотацию
+            # Параметры акцента (accent_alpha, accent_linewidth, accent_order)
+            if wedge_index is not None:
+                wedge_style_params = dict(alpha=alpha, linewidth=accent_linewidth)
+                annotation_style_params = dict(alpha=alpha, zorder=accent_order)
+                bbox_alpha = alpha
+                
+                accent_annotation = annotations[wedge_index]
+                accent_wedge = wedges[wedge_index]
+                
+                accent_wedge.set(**wedge_style_params)                
+                accent_annotation.set(**annotation_style_params)
+                
+                bbox = accent_annotation.get_bbox_patch()
+                r, g, b, _ = bbox.get_facecolor()
+                bbox.set_facecolor((r, g, b, bbox_alpha))
+                accent_annotation.set_bbox(bbox)
+                
+            # Обновить диаграмму
+            plt.draw()
         
-        def on_wedge_click(event):
-            def save_params(wedges):
-                pass
-            
-            def restore_params(wedges, annotations, params):
-                pass
-            
-            def is_click_fell_on_wedge(click_coords, wedge) -> bool:
-                x, y = click_coords
-                center = (0, 0)
-                # Calculate the angle of the click event relative to the center of the pie chart
-                angle = np.arctan2(y - center[1], x - center[0])
-                # Calculate the angle of the click relative to the starting angle
-                angle %= 2*np.pi  # Ensure angle is within [0, 360] degrees
-                if (0 <= angle <= np.pi/2):
-                    angle += 2*np.pi
-                # Calculate the distance between the click event and the center of the pie chart
-                distance = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                
-                theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
-                
-                # TODO: Make `wedge.r + 1` a param?
-                if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
-                    return True
-                
-                return False
-            
-            def highlight_wedge(wedge):
-                pass
-            
-            def highlight_annotation(annotation):
-                pass
-            
+        def on_wedge_click(event, wedges, annotations, style_params):
             if event.inaxes != ax:
                 return
             
-            x, y = event.xdata, event.ydata  # Coordinates of the click event
-            
-            params = save_params(wedges, annotations)
-            for wedge in wedges:
-                hit = is_click_fell_on_wedge((x, y), wedge)
+            center = np.array([0, 0])  # Center of the pie chart
+            xy = np.array([event.xdata, event.ydata])  # Coordinates of the click event
+            angles = np.arctan2(xy[1] - center[1], xy[0] - center[0])
+            angles %= 2*np.pi  # Ensure angle is within [0, 360] degrees
+            angles[angles < 0] += 2*np.pi # Все отрицательные углы переводятся в эквивалентные положительные (+2пи)
+            distances = np.sqrt(np.sum((xy - center)**2, axis=0))
+            # Calculate значения theta1 and theta2 для каждой доли
+            theta_values = np.deg2rad(np.array([[wedge.theta1, wedge.theta2] for wedge in wedges]))
+            # Индекс кликнутых долей
+            wedge_indixes = np.where((theta_values[:, 0] <= angles) & (angles <= theta_values[:, 1])
+                                     & (distances <= np.array([wedge.r + 1 for wedge in wedges])))[0]
 
-                restore_params(wedges, annotations, params)
-                
-                if hit:
-                    highlight_wedge(wedge)
-                    highlight_annotation(annotation)
-                    break
+            wedge_index = None
+            # Если клик пришёлся хотя бы на одну из долей (чаще всего wedge_indixes 0 или 1)
+            if len(wedge_indixes) > 0:
+                wedge_index = wedge_indixes[0]
             
-            plt.draw()
-        
+            update_annotations_and_wedges(wedge_index, wedges, annotations, **style_params)
+
         # Diagram data is dict where each value is dict:
         # center_id — ID центральной точки
         # c_value — Значение атрибута центральной точки. Атрибут выбран в diagram_field
@@ -123,148 +141,52 @@ class GravityModelDiagramManager:
         subplots_adjustment = SUBPLOT_ADJUSTMENT
         ax_title_params = AX_TITLE_PARAMS
         pie_params = PIE_PARAMS
-        annotation_text = ANNOTATION_TEXT_FORMAT
+        annotation_text_format = ANNOTATION_TEXT_FORMAT
+        annotation_params = ANNOTATION_PARAMS
+        on_click_style_params = ON_CLICK_STYLE_PARAMS
         
         # Начало создания диаграммы.
         fig, ax = plt.subplots()
         
-        fig.canvas.mpl_connect('button_press_event', on_wedge_click)
         fig.subplots_adjust(**subplots_adjustment)
         
         ax.set_title('Распределение потребителей среди поставщиков', **ax_title_params)
         pie = ax.pie(x, colors=colors, **pie_params)
         wedges = pie[0]        
+        annotations = []
 
         for wedge, u_id, value_text, value_pct in zip(wedges, u_ids, value_texts, values_pct):
+            # Предотвратить слишком длинный текст в аннотации
+            if len(value_text) > 19:
+                value_text = value_text[:18]+'…'
+            
             start_angle_deg = (wedge.theta1 + wedge.theta2)/2 # Mid-angle of the slice
             start_angle_rad = np.deg2rad(start_angle_deg)
             x = np.cos(start_angle_rad)
             y = np.sin(start_angle_rad)
             text_x = 1.35*np.sign(x)
             text_y = 1.4*y
+            annotation_params.update(dict(xy=(x, y), xytext=(text_x, text_y)))
 
-            if len(value_label) > 19:
-                value_label = value_label[:18]+'…'
-
-            annotation_params = ANNOTATION_PARAMS
+            # TODO: set self._uid_field and self._selected_field
+            # TODO: what is in self._uid_field and self._selected_field?
+            # TODO: create get_name() or smth
+            uid_name = get_name(self._uid_field)
+            value_text_name = get_name(self._selected_field)
+            
+            # order matters!
+            format_vars = uid_name, u_id, value_text_name, value_text, value_pct
+            annotation_params.update(dict(text=annotation_text_format.format(**format_vars)))
+            
             horizontal_alignment = {-1: "right", 1: "left"}[int(np.sign(x))]
             annotation_params.update(dict(horizontalalignment=horizontal_alignment))
             
             connection_style = f"angle,angleA=0,angleB={start_angle_deg}"
             annotation_params['arrowprops'].update(dict(connectionstyle=connection_style))
             
-            # TODO: set self.uid_name and self.value_text_name
-            ax.annotate(annotation_text.format(self.uid_name, u_id, 
-                                               self.value_text_name, value_text, 
-                                               value_pct),
-                        xy=(x, y), xytext=(text_x, text_y),
-                        **annotation_params)
-        
-        return FigureCanvas(fig)
-        #-------
-
-        colors = plt.cm.tab10(np.arange(len(my_dict)))
-        
-        # как работать с numpy and mathplotlib
-        fig, ax = plt.subplots()
-        ax.set_title('Распределение потребителей среди поставщиков', fontsize=10, pad=40)
-        
-        pie = ax.pie(my_dict.values(), startangle=90)
-        
-        center_circle = plt.Circle((0, 0), 0.50, color='white', fc='white', linewidth=0)
-        ax.add_artist(center_circle)
-        
-        annotations = []
-        for i, (category, value) in enumerate(my_dict.items()):
-            angle = pie[0][i].theta1  # Start angle of the slice
-            angle += (pie[0][i].theta2 - pie[0][i].theta1) / 2 # Mid-angle of the slice
-            angle_rad = np.deg2rad(angle)
-            radius = 1.1  # Adjust this value to control the length of the lines
-        
-            x = radius * np.cos(angle_rad)
-            y = radius * np.sin(angle_rad)
-            
-            # Adjust percentage labels
-            label_x = 1.5 * np.cos(angle_rad)  # Adjust the position of the label along x-axis
-            label_y = 1.5 * np.sin(angle_rad)  # Adjust the position of the label along y-axis
-            percent = my_dict[category]*100
-            value = str(list(my_dict.keys())[i])
-            if len(value) > 19:
-                value = value[:18]+'…'
-            
-            annotation = ax.annotate('{:.1f}%\n{}'.format(percent, value),
-                        xy=(x, y), xytext=(label_x, label_y),
-                        ha='center', va='center', fontsize=10, color='white',
-                        arrowprops=dict(arrowstyle='-', color=colors[i]),
-                        bbox=dict(boxstyle="round,pad=0.2", fc=colors[i], alpha=1.0, edgecolor='none'))
-            
+            annotation = ax.annotate(**annotation_params)
             annotations.append(annotation)
         
-        wedges = pie[0]
-        for wedge in wedges:
-            wedge.set_edgecolor('white')
-            wedge.set_linewidth(1)
-        
-        def onclick(event):
-            edge_highlighed = False
-            if event.inaxes == ax:
-                center = (0, 0)  # Center of the pie chart
-                x, y = event.xdata, event.ydata  # Coordinates of the click event
-                # # Calculate the angle of the click event relative to the center of the pie chart
-                angle = np.arctan2(y - center[1], x - center[0])
-                # Calculate the angle of the click relative to the starting angle
-                angle %= 2*np.pi  # Ensure angle is within [0, 360] degrees
-                if (0 <= angle <= np.pi/2):
-                    angle += 2*np.pi
-                # Calculate the distance between the click event and the center of the pie chart
-                distance = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-                # Iterate over the wedges and check if the click event falls within the boundaries of each wedge
-                for i, wedge in enumerate(wedges):
-                    theta1, theta2 = np.deg2rad(wedge.theta1), np.deg2rad(wedge.theta2)
-                    
-                    if (theta1 <= angle <= theta2) and (distance <= wedge.r + 1):
-                        edge_highlighed = True
-                        # Reduce alpha for all annotations and wedges
-                        for annotation in annotations:
-                            annotation.set_alpha(0.35)
-                            # Retrieve the bounding box patch object
-                            bbox_patch = annotation.get_bbox_patch()
-                            r, g, b, _ = bbox_patch.get_facecolor()
-                            bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,0.35), edgecolor='none')
-                            annotation.set_bbox(bbox)
-                        for wedge in wedges:
-                            wedge.set_alpha(0.35)
-                            wedge.set_linewidth(1)
-                        current_annotation = annotations[i]
-                        current_wedge = wedges[i]
-                        # Set alpha to 1 for the clicked annotation and wedge
-                        current_annotation.set_alpha(1)
-                        current_annotation.set_zorder(12)
-                        bbox_patch = current_annotation.get_bbox_patch()
-                        r, g, b, _ = bbox_patch.get_facecolor()
-                        bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
-                        current_annotation.set_bbox(bbox)
-                        current_wedge.set_alpha(1)
-                        # Add white border to the clicked wedge
-                        current_wedge.set_linewidth(2)
-                        plt.draw()
-                        break  # Exit loop once a wedge is found
-                        
-            if not edge_highlighed:
-                for annotation in annotations:
-                    annotation.set_alpha(1)
-                    # Retrieve the bounding box patch object
-                    bbox_patch = annotation.get_bbox_patch()
-                    r, g, b, _ = bbox_patch.get_facecolor()
-                    bbox=dict(boxstyle="round,pad=0.2", fc=(r,g,b,1), edgecolor='none')
-                    annotation.set_bbox(bbox)
-                for wedge in wedges:
-                    wedge.set_alpha(1)
-                    wedge.set_linewidth(1)
-                plt.draw()
-        
-        fig.canvas.mpl_connect('button_press_event', onclick)
-        
-        fig.subplots_adjust(top=0.77, bottom=0.15, left=0.0, right=1)
-        
+        # TODO: disconnect mechanism
+        fig.canvas.mpl_connect('button_press_event', lambda event: on_wedge_click(event, wedges, annotations, on_click_style_params))
         return FigureCanvas(fig)

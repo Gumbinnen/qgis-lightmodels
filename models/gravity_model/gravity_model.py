@@ -94,10 +94,9 @@ class GravityModel(QObject):
         # TODO: Выбор поля для универсальной идентификации? Если да, то центры, обладающие одинаковым полем идентификации,
         # считаются как один, и их данные по вероятностям складываются?
         #
+        pie_diagram = self.diagram_manager.construct_pie(diagram_data)
         
-        diagram = self.diagram_manager.construct_pie(diagram_data) # rename?
-        
-        self.diagram_manager.update(diagram)
+        self.diagram_manager.update(pie_diagram)
         
         # выделение линий от потребителя к поставщикам
         # Делегировать layer_event_handler?????
