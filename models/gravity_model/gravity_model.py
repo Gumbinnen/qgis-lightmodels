@@ -79,6 +79,8 @@ class GravityModel(QObject):
             for center in layer_centers.getFeatures():
                 center_values.append(center[diagram_field])
 
+        center_values = map(str, center_values)
+
         # Diagram data is dict where each value is dict:
         # center_id — ID центральной точки
         # c_value — Значение атрибута центральной точки. Атрибут выбран в diagram_field
@@ -93,7 +95,18 @@ class GravityModel(QObject):
         # считаются как один, и их данные по вероятностям складываются?
         #
         
-        self.diagram_manager.construct_diagram(diagram_data) # rename?
+        diagram = self.diagram_manager.construct_pie(diagram_data) # rename?
+        
+        self.diagram_manager.update(diagram)
+        
+        # выделение линий от потребителя к поставщикам
+        # Делегировать layer_event_handler?????
+        #
+        line_layer = QgsProject.instance().mapLayersByName('линии [g. m.]')[0]
+        request = QgsFeatureRequest().setFilterExpression(f'{"f_id"} = {f_id}')
+        need_line_ids = [line.id() for line in line_layer.getFeatures(request)]
+        line_layer.selectByIds(need_line_ids)
+        
     
     def go(self, input_data):
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'

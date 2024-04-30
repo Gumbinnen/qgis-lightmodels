@@ -21,7 +21,7 @@ from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.utils import iface
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-import time 
+import time
 import matplotlib.pyplot as plt
 import numpy as np
 import csv

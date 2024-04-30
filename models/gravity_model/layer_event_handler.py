@@ -28,22 +28,3 @@ class LayerEventHandler:
         current_layer.selectionChanged.connect(
             lambda f_ids: self.feature_selection.emit(f_ids)
         )
-    
-    def connect_to_active_layer(self, layer):
-        if self.previous_layer:
-            self.disconnect_signals(self.previous_layer)
-        self.previous_layer = layer
-        self.connect_signals(layer)
-
-    def connect_signals(self, layer):
-        layer.selectionChanged.connect(self.on_feature_clicked)
-
-    def disconnect_signals(self, layer):
-        layer.selectionChanged.disconnect(self.on_feature_clicked)
-
-    def on_feature_clicked(self):
-        # Get the clicked feature ID or attributes
-        selected_features = self.previous_layer.selectedFeatures()
-        if selected_features:
-            feature_id = selected_features[0].id()  # assume single selection
-            self.gravity_model.featureClicked.emit(feature_id)  # emit the signa
