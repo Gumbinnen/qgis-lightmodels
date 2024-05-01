@@ -24,6 +24,8 @@ import re
 import json
 import math
 import csv
+import shutil
+from . import EXPORT_FILE_FORMAT
 from helpers.logger import logger as log
 
 LINE_LAYER_NAME = 'линии [g. m.]'
@@ -45,10 +47,25 @@ class GravityModel(QObject):
     def init_ui(self):
         self.ui_widget = GravityModelWidget(self)
         self.ui_widget.ready.connect(self.go)
+        self.ui_widget.export.connect(self.export)
         
         self.layer_event_handler = LayerEventHandler(self)
         self.layer_event_handler.feature_selection.connect(self.feature_selection)
+
+    def export(self, dir_path, file_name, file_format):
+        if file_format not in EXPORT_FILE_FORMAT:
+            log('Export failed. Unexpected file format.', title=type(self).__name__)
+            return
         
+        # TODO: Как определять source? Из cmb на виджете, но по умолчанию текущая группа
+        source = 
+        destination = os.path.join(dir_path, file_name)
+        
+        try:
+            shutil.copy(source, destination)
+        except Exception as e:
+            log('File export failed with exception: ', str(e), title=type(self).__name__)
+
     def run(self):
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
@@ -105,7 +122,6 @@ class GravityModel(QObject):
         line_ids = [line.id() for line in line_layer.getFeatures(request)]
         line_layer.selectByIds(line_ids)
         
-    
     def go(self, input_data):
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
         

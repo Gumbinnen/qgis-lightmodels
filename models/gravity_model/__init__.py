@@ -11,3 +11,7 @@ GRAVITY_MODEL_VAR_NAME = {
 CONFIG_VALIDATION_ERROR = {
     '': '',
 }
+
+EXPORT_FILE_FORMAT = {
+    'csv': 'csv'
+}

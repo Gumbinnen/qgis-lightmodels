@@ -5,17 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsMapLayerProxyModel
 import os
-from . import GRAVITY_MODEL_VAR_NAME
-
-# GRAVITY_MODEL_VAR_NAME = {
-#     'LAYER_CONSUMER': 0,
-#     'LAYER_SITE': 1,
-#     'FIELD_CONSUMER': 2,
-#     'FIELD_SITE': 3,
-#     'ALPHA': 4,
-#     'BETA': 5,
-#     'DISTANCE_LIMIT_METERS': 6,
-# }
+from . import GRAVITY_MODEL_VAR_NAME, EXPORT_FILE_FORMAT
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'res', 'ui', 'gravity_model_dockwidget.ui'))
@@ -27,6 +17,7 @@ LAYER_CMBOX_NAME = {
 
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
+    export = pyqtSignal(str, str, str)
     diagram_field_selected = pyqtSignal(str)
     
     def __init__(self, parent=None):
@@ -51,6 +42,8 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
             lambda field_name: self.diagram_field_selected.emit(field_name))
         
         self.btn_ok.clicked.connect(self.ok)
+        
+        self.btn_export.clicked.connect(self.export)
         
     def update_field_cmbox(self, layer_cmbox_name: str):
         cmbox_layer, cmbox_field = {
@@ -93,20 +86,34 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         distance_limit_meters = int(self.spbox_alpha.value())
         
         return layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters
-    
 
     def ok(self):
+        var = GRAVITY_MODEL_VAR_NAME
         layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters = self.get_input()
         
         input_data = {
-            GRAVITY_MODEL_VAR_NAME['LAYER_CONSUMER']: layer_consumer,
-            GRAVITY_MODEL_VAR_NAME['LAYER_SITE']: layer_site,
-            GRAVITY_MODEL_VAR_NAME['FIELD_CONSUMER']: field_consumer,
-            GRAVITY_MODEL_VAR_NAME['FIELD_SITE']: field_site,
-            GRAVITY_MODEL_VAR_NAME['ALPHA']: alpha,
-            GRAVITY_MODEL_VAR_NAME['BETA']: beta,
-            GRAVITY_MODEL_VAR_NAME['DISTANCE_LIMIT_METERS']: distance_limit_meters,
+            var['LAYER_CONSUMER']: layer_consumer,
+            var['LAYER_SITE']: layer_site,
+            var['FIELD_CONSUMER']: field_consumer,
+            var['FIELD_SITE']: field_site,
+            var['ALPHA']: alpha,
+            var['BETA']: beta,
+            var['DISTANCE_LIMIT_METERS']: distance_limit_meters,
         }
         
         self.ready.emit(input_data)
-        
+
+    def export(self):
+        extension = EXPORT_FILE_FORMAT
+        file_format = self.cmbox_file_format
+        if file_format == extension['csv']:
+            # TODO: Диалоговое окно с выбором путя к файлу и имени.
+            dir_path = 
+            file_name = 
+            self.export.emit(dir_path, file_name, file_format)
+            return
+
+    # def d(self):
+    #     var = 
+    #     self.cmbox_uid_field
+    #     self.cmbox_field
