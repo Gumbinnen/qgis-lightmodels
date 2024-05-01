@@ -26,6 +26,7 @@ import math
 import csv
 from helpers.logger import logger as log
 
+LINE_LAYER_NAME = 'линии [g. m.]'
 
 class GravityModel(QObject):
     def __init__(self, parent=None):
@@ -99,12 +100,10 @@ class GravityModel(QObject):
         self.diagram_manager.update(pie_diagram)
         
         # выделение линий от потребителя к поставщикам
-        # Делегировать layer_event_handler?????
-        #
-        line_layer = QgsProject.instance().mapLayersByName('линии [g. m.]')[0]
-        request = QgsFeatureRequest().setFilterExpression(f'{"f_id"} = {f_id}')
-        need_line_ids = [line.id() for line in line_layer.getFeatures(request)]
-        line_layer.selectByIds(need_line_ids)
+        line_layer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
+        request = QgsFeatureRequest().setFilterExpression(f'"f_id"={f_id}')
+        line_ids = [line.id() for line in line_layer.getFeatures(request)]
+        line_layer.selectByIds(line_ids)
         
     
     def go(self, input_data):
@@ -141,7 +140,7 @@ class GravityModel(QObject):
             return point_layer
         
         def create_line_layer(layer):
-            line_layer = QgsVectorLayer('LineString?crs=' + layer.crs().authid(), 'линии [g. m.]', 'memory')
+            line_layer = QgsVectorLayer('LineString?crs=' + layer.crs().authid(), LINE_LAYER_NAME, 'memory')
             line_data = line_layer.dataProvider()
             line_data.addAttributes([QgsField('f_id', QVariant.Int), QgsField('tc_id', QVariant.Int)])
             line_layer.updateFields()
@@ -161,6 +160,13 @@ class GravityModel(QObject):
             graduated_symbol.setGraduatedMethod(QgsGraduatedSymbolRenderer.GraduatedSize)
             graduated_symbol.setSymbolSizes(min_size, max_size)
             graduated_symbol.updateRangeLabels()
+            ranges = []
+            for lower, upper in graduated_symbol.ranges():
+                symbol = QgsSymbol.defaultSymbol(layer_tc.geometryType())
+                symbol.setColor(QColor("red"))  # Set the color for this range
+                ranges.append(QgsRendererRange(lower, upper, symbol, f'{lower} - {upper}'))
+
+            graduated_symbol.updateRanges(ranges)
             return graduated_symbol
 
         # Импорт данных из формы в self.config
@@ -197,7 +203,7 @@ class GravityModel(QObject):
         data = []
         for f in list(layer.getFeatures()):
             tc_to_h_dict = {}
-            
+
             f_coords = get_feature_coords(f)
             if f_coords is None:
                 log('Гравитационная модель остановлена')
@@ -209,7 +215,7 @@ class GravityModel(QObject):
                     log('Гравитционная модель остановлена')
                     return
                 
-                distance_degrees = f.geometry().distance(tc.geometry())
+                # distance_degrees = f.geometry().distance(tc.geometry())
                 distance_meters = calculate_distance_in_meters(f_coords, tc_coords)
 
                 if distance_meters > max_distance:
