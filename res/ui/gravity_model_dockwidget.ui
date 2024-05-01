@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>376</width>
-    <height>421</height>
+    <width>375</width>
+    <height>430</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
       <x>0</x>
       <y>0</y>
       <width>381</width>
-      <height>406</height>
+      <height>411</height>
      </rect>
     </property>
     <property name="currentIndex">
@@ -39,7 +39,7 @@
         <height>371</height>
        </rect>
       </property>
-      <layout class="QVBoxLayout" name="vertical_layout">
+      <layout class="QVBoxLayout" name="analysis_vertical_layout">
        <item>
         <widget class="QLabel" name="label_consumer_layer">
          <property name="text">
@@ -182,7 +182,7 @@
           <number>9999999</number>
          </property>
          <property name="value">
-          <number>9999999</number>
+          <number>800000</number>
          </property>
         </widget>
        </item>
@@ -206,73 +206,140 @@
      <attribute name="title">
       <string>Диаграмма</string>
      </attribute>
-     <widget class="QWidget" name="horizontalLayoutWidget">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>299</y>
-        <width>371</width>
-        <height>61</height>
-       </rect>
-      </property>
-      <layout class="QHBoxLayout" name="horizontal_layout">
-       <property name="spacing">
-        <number>8</number>
-       </property>
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="QLabel" name="label_field">
-         <property name="maximumSize">
-          <size>
-           <width>50</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Подписи:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QComboBox" name="cmbox_field">
-         <property name="maximumSize">
-          <size>
-           <width>150</width>
-           <height>16777215</height>
-          </size>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="btn_export">
-         <property name="maximumSize">
-          <size>
-           <width>120</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Экспорт</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
      <widget class="QWidget" name="verticalLayoutWidget_2">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
         <width>371</width>
-        <height>291</height>
+        <height>311</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="diagram_layout"/>
+     </widget>
+     <widget class="QWidget" name="verticalLayoutWidget_4">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>310</y>
+        <width>381</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="diagram_settings_vertical_layout">
+       <item>
+        <widget class="QLabel" name="label_diagram_fields">
+         <property name="maximumSize">
+          <size>
+           <width>567</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Подписи к диаграмме</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="diagram_fields_horizontal_layout">
+         <item>
+          <layout class="QVBoxLayout" name="diagram_uid_field_vertical_layout">
+           <item>
+            <widget class="QLabel" name="label_uid_field">
+             <property name="text">
+              <string>Поле с уникльным ID поставщиков</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="cmbox_uid_field">
+             <property name="maximumSize">
+              <size>
+               <width>366</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="placeholderText">
+              <string>ID поставщиков</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="diagram_field_vertical_layout">
+           <item>
+            <widget class="QLabel" name="label_field">
+             <property name="text">
+              <string>Выберите поле поставщиков</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="cmbox_field">
+             <property name="maximumSize">
+              <size>
+               <width>3466</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="placeholderText">
+              <string>Поле поставщиков</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="export_tab">
+     <attribute name="title">
+      <string>Экспорт</string>
+     </attribute>
+     <widget class="QWidget" name="verticalLayoutWidget_3">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>0</y>
+        <width>351</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="export_vertical_layout">
+       <item>
+        <widget class="QLabel" name="label_file_format">
+         <property name="text">
+          <string>Выберите формат, в котором экспортировать файл</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="cmbox_file_format">
+         <property name="maximumSize">
+          <size>
+           <width>140</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="placeholderText">
+          <string>Формат файла</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_export">
+         <property name="text">
+          <string>Экспорт</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </widget>
    </widget>
