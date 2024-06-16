@@ -1,8 +1,8 @@
 from qgis.core import (QgsMessageLog, Qgis)
 
 class logger:
-    def __init__(self, *messages, note:str='', title:str='', tab:str=None, level=Qgis.Info, sep:str=' '):
-        """Custom log function for Qgis. Combine messages into letter and log.
+    def __init__(self, *messages, note:str='', title:str='', QgisTab:str=None, level=Qgis.Info, sep:str=' '):
+        """Log function for Qgis. Combine messages into letter and log.
 
             Example:
                 log(myValue, 'Status:', myStatus, note='MyValue:', tab='My Values')
@@ -23,8 +23,8 @@ class logger:
                 level (Qgis.MessageLevel, optional): level of the message. Common levels: Info, Warning, Critical, Success. Defaults to Qgis.Info.
                 sep (str, optional): Default separate character. Defaults to ' '.
             """
-        def log(*messages, note:str='', title:str='', tab:str=None, level=Qgis.Info, sep:str=' ') -> None:
-            """Custom log function for Qgis. Combine messages into letter and log.
+        def log(*messages, note:str='', title:str='', QgisTab:str=QgisTab, level=level, sep:str=' ') -> None:
+            """Log function for Qgis. Combine messages into letter and log.
 
             Example:
                 log(myValue, 'Status:', myStatus, note='MyValue:', tab='My Values')
@@ -51,11 +51,11 @@ class logger:
                 letter += sep + str(message)
             if title is not empty and note is not empty:
                 title += sep
-            QgsMessageLog.logMessage(title + note + letter, tag=tab, level=level)
+            QgsMessageLog.logMessage(title + note + letter, tag=QgisTab, level=level)
         
         log(messages=messages,
             note=note,
             title=title,
-            tab=tab,
-            level=Qgis.Info,
+            tab=QgisTab,
+            level=level,
             sep=sep)

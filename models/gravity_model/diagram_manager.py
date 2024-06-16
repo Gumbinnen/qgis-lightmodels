@@ -7,7 +7,7 @@ import numpy as np
 AX_TITLE_PARAMS = dict(fontsize=10, pad=40)
                             
 PIE_WEDGE_PROPS = dict(width=0.5, edgecolor='white', linewidth=1)
-PIE_PARAMS = dict(wedgeprops=PIE_WEDGE_PROPS, startangle = 0)
+PIE_PARAMS = dict(colors=BLUE_PALETTES['light_blue'], wedgeprops=PIE_WEDGE_PROPS, startangle = 0)
 
 ANNOTATION_TEXT_FORMAT = ' '.join(['{}: {}\n', '{}: {}\n', '{:.1f}%'])
 ANNOTATION_PARAMS = dict(arrowprops=dict(arrowstyle='-'),
@@ -17,6 +17,8 @@ ANNOTATION_PARAMS = dict(arrowprops=dict(arrowstyle='-'),
 SUBPLOT_ADJUSTMENT = dict(top=0.77, bottom=0.15, left=0.0, right=1)
 
 ON_CLICK_STYLE_PARAMS = dict(alpha=0.35, linewidth=1, zorder=1, accent_alpha=0.35, accent_linewidth=2, accent_zorder=2)
+
+DIAGRAM_TITLE = 'Распределение потребителей среди поставщиков'
 
 class GravityModelDiagramManager:
     def __init__(self, parent=None):        
@@ -43,16 +45,16 @@ class GravityModelDiagramManager:
         # TODO: rewrite
         def update_annotations_and_wedges(wedge_index, wedges, annotations,
                                           alpha, linewidth, zorder,
-                                          disregard_alpha, accent_linewidth, accent_order):
+                                          dull_alpha, accent_linewidth, accent_order):
             
             wedge_style_params = dict(alpha=alpha, linewidth=linewidth)
             annotation_style_params = dict(alpha=alpha, zorder=zorder)
             bbox_alpha = alpha
             
             if wedge_index is not None:
-                wedge_style_params = dict(alpha=disregard_alpha, linewidth=linewidth)
-                annotation_style_params = dict(alpha=disregard_alpha, zorder=zorder)
-                bbox_alpha = disregard_alpha
+                wedge_style_params = dict(alpha=dull_alpha, linewidth=linewidth)
+                annotation_style_params = dict(alpha=dull_alpha, zorder=zorder)
+                bbox_alpha = dull_alpha
             
             
             # Стандартные параметры аннотаций (alpha, linewidth, zorder)
@@ -137,7 +139,6 @@ class GravityModelDiagramManager:
         values_pct = [percentage(prob_value, prob_values_sum) for prob_value in prob_values]
         
         # Настройки диаграммы
-        colors = BLUE_PALETTES['light_blue']
         subplots_adjustment = SUBPLOT_ADJUSTMENT
         ax_title_params = AX_TITLE_PARAMS
         pie_params = PIE_PARAMS
@@ -150,8 +151,8 @@ class GravityModelDiagramManager:
         
         fig.subplots_adjust(**subplots_adjustment)
         
-        ax.set_title('Распределение потребителей среди поставщиков', **ax_title_params)
-        pie = ax.pie(x, colors=colors, **pie_params)
+        ax.set_title(DIAGRAM_TITLE, **ax_title_params)
+        pie = ax.pie(x, **pie_params)
         wedges = pie[0]        
         annotations = []
 

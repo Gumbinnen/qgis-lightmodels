@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsMapLayerProxyModel
 import os
-from . import GRAVITY_MODEL_VAR_NAME, EXPORT_FILE_FORMAT
+from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'res', 'ui', 'gravity_model_dockwidget.ui'))
@@ -88,29 +88,27 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         return layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters
 
     def ok(self):
-        var = GRAVITY_MODEL_VAR_NAME
         layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters = self.get_input()
         
         input_data = {
-            var['LAYER_CONSUMER']: layer_consumer,
-            var['LAYER_SITE']: layer_site,
-            var['FIELD_CONSUMER']: field_consumer,
-            var['FIELD_SITE']: field_site,
-            var['ALPHA']: alpha,
-            var['BETA']: beta,
-            var['DISTANCE_LIMIT_METERS']: distance_limit_meters,
+            VAR['LAYER_CONSUMER']: layer_consumer,
+            VAR['LAYER_SITE']: layer_site,
+            VAR['FIELD_CONSUMER']: field_consumer,
+            VAR['FIELD_SITE']: field_site,
+            VAR['ALPHA']: alpha,
+            VAR['BETA']: beta,
+            VAR['DISTANCE_LIMIT_METERS']: distance_limit_meters,
         }
         
         self.ready.emit(input_data)
 
     def export(self):
-        extension = EXPORT_FILE_FORMAT
-        file_format = self.cmbox_file_format
-        if file_format == extension['csv']:
+        desired_extension = self.cmbox_file_format
+        if desired_extension in EXPORT_FILE_FORMAT.values():
             # TODO: Диалоговое окно с выбором путя к файлу и имени.
             dir_path = 
             file_name = 
-            self.export.emit(dir_path, file_name, file_format)
+            self.export.emit(dir_path, file_name, desired_extension)
             return
 
     # def d(self):

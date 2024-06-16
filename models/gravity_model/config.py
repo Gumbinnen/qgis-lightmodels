@@ -1,25 +1,17 @@
-# from . import GRAVITY_MODEL_VAR_NAME, CONFIG_VALIDATION_ERROR
-
-GRAVITY_MODEL_VAR_NAME = {
-    'LAYER_CONSUMER': 0,
-    'LAYER_SITE': 1,
-    'FIELD_CONSUMER': 2,
-    'FIELD_SITE': 3,
-    'ALPHA': 4,
-    'BETA': 5,
-    'DISTANCE_LIMIT_METERS': 6,
-}
+from . import GRAVITY_MODEL_VAR_NAME as VAR, CONFIG_VALIDATION_ERROR_MESSAGE as ERR_MSG
+from helpers.logger import logger as log
+from qgis.core import QgsVectorLayer, QgsField, Qgis
 
 class GravityModelConfig:
     def __init__(self, parent=None):
-        self._layer_consumer = None
-        self._layer_site = None
-        self._field_consumer = None
-        self._field_site = None
-        self._alpha = None
-        self._beta = None
-        self._distance_limit_meters = None
-        self._errors = []
+        self._layer_consumer: QgsVectorLayer = None
+        self._layer_site: QgsVectorLayer = None
+        self._field_consumer: QgsField = None
+        self._field_site: QgsField = None
+        self._alpha: float = None
+        self._beta: float = None
+        self._distance_limit_meters: int = None
+        self._errors: list[str] = []
 
     @property
     def layer_consumer(self):
@@ -66,47 +58,49 @@ class GravityModelConfig:
         return self._errors
 
     def update_from_input_data(self, input_data):
-        self._layer_consumer = input_data[GRAVITY_MODEL_VAR_NAME['LAYER_CONSUMER']]
-        self._layer_site = input_data[GRAVITY_MODEL_VAR_NAME['LAYER_SITE']]
-        self._field_consumer = input_data[GRAVITY_MODEL_VAR_NAME['FIELD_CONSUMER']]
-        self._field_site = input_data[GRAVITY_MODEL_VAR_NAME['FIELD_SITE']]
-        self._alpha = input_data[GRAVITY_MODEL_VAR_NAME['ALPHA']]
-        self._beta = input_data[GRAVITY_MODEL_VAR_NAME['BETA']]
-        self._distance_limit_meters = input_data[GRAVITY_MODEL_VAR_NAME['DISTANCE_LIMIT_METERS']]
+        self._layer_consumer = input_data[VAR['LAYER_CONSUMER']]
+        self._layer_site = input_data[VAR['LAYER_SITE']]
+        self._field_consumer = input_data[VAR['FIELD_CONSUMER']]
+        self._field_site = input_data[VAR['FIELD_SITE']]
+        self._alpha = input_data[VAR['ALPHA']]
+        self._beta = input_data[VAR['BETA']]
+        self._distance_limit_meters = input_data[VAR['DISTANCE_LIMIT_METERS']]
         return self.is_valid()
     
     def is_valid(self) -> bool:
-        def error(message):
+        def report(message):
             self._errors.append(message)
+            log(message, note='VALIDATION ERROR:', title=type(self).__name__, level=Qgis.Error)
         
-        # Проверка валидности данных в конфиге
+        # Проверка на валидность данных конфига
         #
         if self._layer_consumer == None:
-            error('bad layer_consumer')
+            report(ERR_MSG['bad layer_consumer'])
             return False
         
         if self._layer_site == None:
-            error('bad layer_site')
+            report(ERR_MSG['bad layer_site'])
             return False
         
         if self._field_consumer == None:
-            error('bad field_consumer')
+            report(ERR_MSG['bad field_consumer'])
             return False
         
         if self._field_site == None:
-            error('bad field_site')
+            report(ERR_MSG['bad field_site'])
             return False
         
         if self._alpha == None:
-            error('bad alpha')
+            report(ERR_MSG['bad alpha'])
             return False
         
         if self._beta == None:
-            error('bad beta')
+            report(ERR_MSG['bad beta'])
             return False
         
         if self._distance_limit_meters == None:
-            error('bad distance_limit_meters')
+            report(ERR_MSG['bad distance_limit_meters'])
             return False
         
+        self._errors.clear()
         return True

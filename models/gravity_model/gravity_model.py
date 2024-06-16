@@ -1,50 +1,46 @@
-from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QInputDialog, QMessageBox, QDockWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QObject
-from lightmodels.widgets.GravityModelWidget import GravityModelWidget
-from lightmodels.widgets.GravityModelConfigWidget import GravityModelConfigWidget
-from qgis.PyQt.QtCore import QVariant, QThread
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, QObject, QVariant
+# from qgis.PyQt.QtCore import QVariant
 from qgis.core import QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsVectorFileWriter
 from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer
-from qgis.core import QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes
-from qgis.core import QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer, QgsCoordinateTransformContext
-from qgis.core import QgsProject, QgsTask, QgsApplication
+from qgis.core import QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes, QgsCoordinateTransformContext
+from qgis.core import QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
+from qgis.core import QgsProject, QgsTask, QgsApplication, QgsRendererRange
 from qgis.core import QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
-import uuid
 from qgis.core import QgsApplication, QgsTask, Qgis, QgsMessageLog
-from concurrent.futures import ThreadPoolExecutor
-from time import sleep
-from models.gravity_model import (
-    GravityModelWidget, LayerEventHandler, GravityModelDataManager,
-    GravityModelDiagramManager, GravityModelConfig as Config
-)
-import os
-import re
-import json
-import math
-import csv
-import shutil
-from . import EXPORT_FILE_FORMAT
-from helpers.logger import logger as log
 
+from concurrent.futures import ThreadPoolExecutor
+from helpers.logger import logger as log
+from .data_manager import GravityModelDataManager as DataManager
+from .diagram_manager import GravityModelDiagramManager as DiagramManager
+from .config import GravityModelConfig as Config
+from .layer_event_handler import LayerEventHandler
+from .widget import GravityModelWidget
+import os
+import math
+import shutil
+
+from . import EXPORT_FILE_FORMAT
 LINE_LAYER_NAME = 'линии [g. m.]'
 
 class GravityModel(QObject):
     def __init__(self, parent=None):
         super(GravityModel, self).__init__()
+        log('__init__() entered.', title=type(self).__name__)
+        
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
         
-        self.ui_widget = None
+        self.ui_widget: GravityModelWidget = None
         self.config = Config()
-        self.data_manager = GravityModelDataManager(self)
-        self.diagram_manager = GravityModelDiagramManager(self)
-        self.layer_event_handler = None
+        self.data_manager = DataManager(self)
+        self.diagram_manager = DiagramManager(self)
+        self.layer_event_handler: LayerEventHandler = None
         
         self.init_ui()
         
     def init_ui(self):
+        log('init_ui() entered.', title=type(self).__name__)
+        
         self.ui_widget = GravityModelWidget(self)
         self.ui_widget.ready.connect(self.go)
         self.ui_widget.export.connect(self.export)
@@ -52,21 +48,22 @@ class GravityModel(QObject):
         self.layer_event_handler = LayerEventHandler(self)
         self.layer_event_handler.feature_selection.connect(self.feature_selection)
 
-    def export(self, dir_path, file_name, file_format):
+    def export(self, dir_path: str, file_name: str, file_format: str):
         if file_format not in EXPORT_FILE_FORMAT:
-            log('Export failed. Unexpected file format.', title=type(self).__name__)
+            log('Export failed. Unexpected file format.', title=type(self).__name__, level=Qgis.Error)
             return
         
         # TODO: Как определять source? Из cmb на виджете, но по умолчанию текущая группа
-        source = 
+        source = self.data_manager.get…
         destination = os.path.join(dir_path, file_name)
         
         try:
             shutil.copy(source, destination)
         except Exception as e:
-            log('File export failed with exception: ', str(e), title=type(self).__name__)
+            log('File export failed with exception: ', str(e), title=type(self).__name__, level=Qgis.Error)
 
     def run(self):
+        log('run() entered.', title=type(self).__name__)
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
     
@@ -91,9 +88,9 @@ class GravityModel(QObject):
         #           f_probability_values
         center_ids, f_prob_values = self.data_manager.get_gravity_values_by_feature_id(data_path, f_id)
         
-        center_values = []        
+        center_values = []
         diagram_field = self.diagram_manager.selected_field
-        if diagram_field != None and not is_id_field(diagram_field): # is_id_field() for `id object`???
+        if diagram_field != None and not is_id_field(diagram_field): # TODO: is_id_field() for `id object`???
             for center in layer_centers.getFeatures():
                 center_values.append(center[diagram_field])
 
@@ -117,13 +114,20 @@ class GravityModel(QObject):
         self.diagram_manager.update(pie_diagram)
         
         # выделение линий от потребителя к поставщикам
-        line_layer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
-        request = QgsFeatureRequest().setFilterExpression(f'"f_id"={f_id}')
-        line_ids = [line.id() for line in line_layer.getFeatures(request)]
-        line_layer.selectByIds(line_ids)
+        line_layer: QgsVectorLayer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
+        line_layer.selectByExpression(f'"f_id"={f_id}', QgsVectorLayer.SetSelection)
+        
+        # OLD VERSION:
+        # line_layer: QgsVectorLayer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
+        # request: QgsFeatureRequest = QgsFeatureRequest().setFilterExpression(f'"f_id"={f_id}')
+        # line_ids: list[str] = [line.id() for line in line_layer.getFeatures(request)]
+        # line_layer.selectByIds(line_ids)
         
     def go(self, input_data):
+        log('go() entered.', title=type(self).__name__)
+        
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
+        LAYER_GROUP_NAME = 'Гравитационная модель'
         
         def calculate_distance_in_meters(f1, f2):
             EARTH_RADIUS = 6371
@@ -188,7 +192,7 @@ class GravityModel(QObject):
         # Импорт данных из формы в self.config
         ok = self.config.update_from_input_data(input_data)
         if not ok:
-            log(self.config.errors)
+            log(self.config.errors, level=Qgis.Error, title=type(self).__name__)
             return
 
         # Получение переменных из self.config
@@ -206,7 +210,7 @@ class GravityModel(QObject):
         line_layer = create_line_layer(layer)
 
         # создаем группу и помещаем туда слои
-        group = QgsLayerTreeGroup('Гравитационная модель')
+        group = QgsLayerTreeGroup(LAYER_GROUP_NAME)
         group.insertChildNode(0, QgsLayerTreeLayer(layer))
         group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
 
@@ -222,13 +226,13 @@ class GravityModel(QObject):
 
             f_coords = get_feature_coords(f)
             if f_coords is None:
-                log('Гравитационная модель остановлена')
+                log('Гравитационная модель остановлена.', level=Qgis.Error, title=type(self).__name__)
                 return
             
             for tc in layer_tc.getFeatures():                
                 tc_coords = get_feature_coords(tc)
                 if tc_coords is None:
-                    log('Гравитционная модель остановлена')
+                    log('Гравитционная модель остановлена.', level=Qgis.Error, title=type(self).__name__)
                     return
                 
                 # distance_degrees = f.geometry().distance(tc.geometry())

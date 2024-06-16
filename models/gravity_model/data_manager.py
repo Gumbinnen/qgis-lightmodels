@@ -1,3 +1,4 @@
+from typing_extensions import deprecated
 from qgis.core import QgsProject, QgsVectorLayer
 import os, csv
 
@@ -104,6 +105,10 @@ class GravityModelDataManager:
             elif str(first_layer_id) in layer_ids[1]:
                 return layer_ids[0]
         return None
+
+    @deprecated("Use is_gmlayer() instead")
+    def is_gmlayer(self, layer):
+        return False
 
     def read(self, data_path, contains_headers=False):
         if not self.dir_exists:

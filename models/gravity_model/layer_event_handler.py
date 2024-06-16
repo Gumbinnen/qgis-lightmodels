@@ -1,5 +1,7 @@
 from PyQt5.QtCore import pyqtSignal
-from qgis.core import QgsFeature
+from qgis.core import Qgis
+from helpers.logger import logger as log
+from .data_manager import GravityModelDataManager as DataManager
 
 class LayerEventHandler:
     feature_selection = pyqtSignal()
@@ -7,7 +9,7 @@ class LayerEventHandler:
     def __init__(self, parent=None):
         self._previous_layer = None
         self.iface = parent.iface
-        self.data_manager = parent.data_manager
+        self.data_manager: DataManager = parent.data_manager
         
         self.iface.currentLayerChanged.connect(self.on_active_layer_changed)
     
@@ -17,6 +19,7 @@ class LayerEventHandler:
         # Проверка существования gm_data файла для этого слоя
         is_gmlayer = self.data_manager.is_gmlayer(current_layer)
         if not is_gmlayer:
+            log('Unexpected layer type.', title=type(self).__name__, level=Qgis.Error)
             return
         
         # Новый активный слой
