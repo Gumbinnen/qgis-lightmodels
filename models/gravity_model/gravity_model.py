@@ -29,7 +29,7 @@ class GravityModel(QObject):
         
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
-        
+
         self.ui_widget: GravityModelWidget = None
         self.config = Config()
         self.data_manager = DataManager(self)
@@ -40,7 +40,7 @@ class GravityModel(QObject):
         
     def init_ui(self):
         log('init_ui() entered.', title=type(self).__name__)
-        
+    
         self.ui_widget = GravityModelWidget(self)
         self.ui_widget.ready.connect(self.go)
         self.ui_widget.export.connect(self.export)
