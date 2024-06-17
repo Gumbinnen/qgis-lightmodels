@@ -1,12 +1,14 @@
 from PyQt5.QtCore import Qt, QObject, QVariant
 # from qgis.PyQt.QtCore import QVariant
-from qgis.core import QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsVectorFileWriter
-from qgis.core import QgsLayerTreeGroup, QgsGraduatedSymbolRenderer
-from qgis.core import QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes, QgsCoordinateTransformContext
-from qgis.core import QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer
-from qgis.core import QgsProject, QgsTask, QgsApplication, QgsRendererRange
-from qgis.core import QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer
-from qgis.core import QgsApplication, QgsTask, Qgis, QgsMessageLog
+
+# from qgis.core import *
+# For the sake of convinience.
+from qgis.core import (
+    QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsVectorFileWriter, QgsRendererRange,
+    QgsLayerTreeGroup, QgsGraduatedSymbolRenderer, QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes, QgsCoordinateTransformContext,
+    QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer, QgsProject, QgsTask, QgsApplication, 
+    QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer, QgsApplication, QgsTask, Qgis, QgsMessageLog
+)
 
 from concurrent.futures import ThreadPoolExecutor
 from helpers.logger import logger as log
@@ -213,6 +215,7 @@ class GravityModel(QObject):
         group = QgsLayerTreeGroup(LAYER_GROUP_NAME)
         group.insertChildNode(0, QgsLayerTreeLayer(layer))
         group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
+        group
 
         # добавляем поле 'weight'
         if layer_tc.fields().indexFromName(WEIGHT_FIELD_NAME) == -1: 
