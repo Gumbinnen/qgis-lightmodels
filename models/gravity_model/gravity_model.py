@@ -11,7 +11,8 @@ from qgis.core import (
 )
 
 from concurrent.futures import ThreadPoolExecutor
-from helpers.logger import logger as log
+from functools import partial
+from . import log as log_function
 from .data_manager import GravityModelDataManager as DataManager
 from .diagram_manager import GravityModelDiagramManager as DiagramManager
 from .config import GravityModelConfig as Config
@@ -24,13 +25,15 @@ import shutil
 from . import EXPORT_FILE_FORMAT
 LINE_LAYER_NAME = 'линии [g. m.]'
 
+
 class GravityModel(QObject):
     def __init__(self, parent=None):
         super(GravityModel, self).__init__()
-        log('__init__() entered.', title=type(self).__name__)
+        self.log('__init__() entered.')
         
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
+        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
 
         self.ui_widget: GravityModelWidget = None
         self.config = Config()
@@ -41,7 +44,7 @@ class GravityModel(QObject):
         self.init_ui()
         
     def init_ui(self):
-        log('init_ui() entered.', title=type(self).__name__)
+        self.log('init_ui() entered.')
     
         self.ui_widget = GravityModelWidget(self)
         self.ui_widget.ready.connect(self.go)
@@ -52,7 +55,7 @@ class GravityModel(QObject):
 
     def export(self, dir_path: str, file_name: str, file_format: str):
         if file_format not in EXPORT_FILE_FORMAT:
-            log('Export failed. Unexpected file format.', title=type(self).__name__, level=Qgis.Error)
+            self.log('Export failed. Unexpected file format.', level=Qgis.Critical)
             return
         
         # TODO: Как определять source? Из cmb на виджете, но по умолчанию текущая группа
@@ -62,10 +65,10 @@ class GravityModel(QObject):
         try:
             shutil.copy(source, destination)
         except Exception as e:
-            log('File export failed with exception: ', str(e), title=type(self).__name__, level=Qgis.Error)
+            self.log('File export failed with exception: ', str(e), level=Qgis.Critical)
 
     def run(self):
-        log('run() entered.', title=type(self).__name__)
+        self.log('run() entered.')
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
     
@@ -126,7 +129,7 @@ class GravityModel(QObject):
         # line_layer.selectByIds(line_ids)
         
     def go(self, input_data):
-        log('go() entered.', title=type(self).__name__)
+        self.log('go() entered.')
         
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
         LAYER_GROUP_NAME = 'Гравитационная модель'
@@ -153,18 +156,20 @@ class GravityModel(QObject):
             return distance_meters
         
         def create_point_layer(layer):
-            point_layer = QgsVectorLayer("Point?crs=" + layer.crs().authid(), f'{layer.name()} [g. m.]', "memory")
-            point_data = point_layer.dataProvider()
-            point_data.addAttributes(layer.fields())
-            point_data.addFeatures(layer.getFeatures())
+            point_layer = QgsVectorLayer("Point?crs=" + layer.crs().authid(), f'{layer.name()} [g. m.]', 'memory')
+            
+            point_layer_provider = point_layer.dataProvider()
+            point_layer_provider.addAttributes(layer.fields())
+            point_layer_provider.addFeatures(layer.getFeatures())
             point_layer.updateFields()
-            QgsProject.instance().addMapLayer(point_layer, False)
             return point_layer
         
         def create_line_layer(layer):
             line_layer = QgsVectorLayer('LineString?crs=' + layer.crs().authid(), LINE_LAYER_NAME, 'memory')
-            line_data = line_layer.dataProvider()
-            line_data.addAttributes([QgsField('f_id', QVariant.Int), QgsField('tc_id', QVariant.Int)])
+            line_layer.setOpacity(0.5)
+            
+            line_layer_provider = line_layer.dataProvider()
+            line_layer_provider.addAttributes([QgsField('f_id', QVariant.Int), QgsField('tc_id', QVariant.Int)])
             line_layer.updateFields()
             return line_layer
         
@@ -191,16 +196,22 @@ class GravityModel(QObject):
             graduated_symbol.updateRanges(ranges)
             return graduated_symbol
 
+        def create_line_feature(f1, f2):
+            line_geom = QgsGeometry.fromPolyline([QgsPoint(f1.geometry().asPoint()), QgsPoint(f2.geometry().asPoint())])
+            line_feature = QgsFeature().setGeometry(line_geom)
+            line_feature.setAttributes([f1.id(), f2.id()])
+            return line_feature
+
         # Импорт данных из формы в self.config
         ok = self.config.update_from_input_data(input_data)
         if not ok:
-            log(self.config.errors, level=Qgis.Error, title=type(self).__name__)
+            self.log(self.config.errors, level=Qgis.Critical)
             return
 
         # Получение переменных из self.config
-        layer, layer_tc = self.config.all_layers
-        layer_attr, layer_tc_attr = self.config.all_fields
-        alpha, beta, max_distance = self.config.all_numeric_params
+        (layer, layer_tc,
+        layer_attr, layer_attr_tc,
+        alpha, beta, max_distance) = self.config.all_params()
 
         # создаем точечный слой поставщиков
         layer_tc = create_point_layer(layer_tc)
@@ -210,12 +221,11 @@ class GravityModel(QObject):
 
         # создаем линейный слой зоны влияния центра
         line_layer = create_line_layer(layer)
-
-        # создаем группу и помещаем туда слои
-        group = QgsLayerTreeGroup(LAYER_GROUP_NAME)
-        group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
-        group
+        line_layer_provider = line_layer.dataProvider()
+        
+        # добавляем слои в проект
+        project = QgsProject.instance()
+        project.addMapLayers([layer_tc, layer, line_layer], False)
 
         # добавляем поле 'weight'
         if layer_tc.fields().indexFromName(WEIGHT_FIELD_NAME) == -1: 
@@ -223,41 +233,43 @@ class GravityModel(QObject):
             layer_tc.updateFields()
         
         # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
+        # https://en.wikipedia.org/wiki/Huff_model
         data = []
         for f in list(layer.getFeatures()):
-            tc_to_h_dict = {}
-
+            # final value will be: h / total_h
+            # h is the numerator of Huff_model formula
+            # tc_h_dict is dict[tc_id] = h
+            tc_h_dict = {}
+            
             f_coords = get_feature_coords(f)
             if f_coords is None:
-                log('Гравитационная модель остановлена.', level=Qgis.Error, title=type(self).__name__)
+                self.log('Гравитационная модель остановлена.', level=Qgis.Critical)
                 return
             
             for tc in layer_tc.getFeatures():                
                 tc_coords = get_feature_coords(tc)
                 if tc_coords is None:
-                    log('Гравитционная модель остановлена.', level=Qgis.Error, title=type(self).__name__)
+                    self.log('Гравитционная модель остановлена.', level=Qgis.Critical)
                     return
                 
                 # distance_degrees = f.geometry().distance(tc.geometry())
                 distance_meters = calculate_distance_in_meters(f_coords, tc_coords)
 
                 if distance_meters > max_distance:
-                    tc_to_h_dict[tc.id()] = 0
+                    tc_h_dict[tc.id()] = 0
                     continue
                 
-                tc_to_h_dict[tc.id()] = tc[layer_tc_attr]**alpha / distance_meters**beta
+                h = tc[layer_attr_tc]**alpha / distance_meters**beta
+                tc_h_dict[tc.id()] = h
                 
                 # Добавить линии в line_layer
-                line_geom = QgsGeometry.fromPolyline([QgsPoint(f.geometry().asPoint()), QgsPoint(tc.geometry().asPoint())])
-                line_feature = QgsFeature()
-                line_feature.setGeometry(line_geom)
-                line_feature.setAttributes([f.id(), tc.id()])
-                line_layer.dataProvider().addFeatures([line_feature])
+                line_feature = create_line_feature(f, tc)
+                line_layer_provider.addFeatures([line_feature])
 
             # Для каждой точки f записываем row в data
-            total_h = sum(tc_to_h_dict.values())
+            total_h = sum(tc_h_dict.values())
             row = [f.id()]
-            for tc_id, h in tc_to_h_dict.items():
+            for tc_id, h in tc_h_dict.items():
                 if total_h == 0:
                     row.append(0)
                     continue
@@ -266,14 +278,11 @@ class GravityModel(QObject):
                 row.append(probability)
             data.append(row)
 
+        # Заголовок headers для данных выглядит так:
+        # f, tc1_id, tc2_id, tc3_id, ...
         headers = ['f']
         for tc in layer_tc.getFeatures():
             headers.append(tc.id())
-
-        # добавялем линейный слой в группу
-        line_layer.setOpacity(0.5)
-        QgsProject.instance().addMapLayer(line_layer, False)
-        group.insertChildNode(group.children().__len__(), QgsLayerTreeLayer(line_layer))
         
         # Записываем данные в .csv файл
         gm_data_path = self.data_manager.create_file(layer, layer_tc)
@@ -293,13 +302,24 @@ class GravityModel(QObject):
             layer_tc.updateFeature(tc)
         layer_tc.commitChanges()
 
-        # задание стиля для слоя поставщиков
+        # Задание стиля для слоя поставщиков
         graduated_symbol = create_graduated_symbol(WEIGHT_FIELD_NAME, n_classes=5, min_size=4, max_size=10)
         layer_tc.setRenderer(graduated_symbol)
         layer_tc.triggerRepaint()
 
-        # добавляем созданную группу в проект
-        root = QgsProject().instance().layerTreeRoot()
+        # Создаем группу и помещаем туда слои
+        # might use group.children().__len__()
+        group = QgsLayerTreeGroup(LAYER_GROUP_NAME)
+        group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
+        group.insertChildNode(1, QgsLayerTreeLayer(layer))
+        group.insertChildNode(2, QgsLayerTreeLayer(line_layer))
+
+        # Добавляем созданную группу в проект
+        root = project.layerTreeRoot()
         root.insertChildNode(0, group)
 
+        # Устанавливаем активный слой
         self.iface.setActiveLayer(layer)
+
+# def log(msg, note='', title=type(GravityModel).__name__, QgisTab=None, level=Qgis.Info, sep=' '):
+#    logger(msg, note=note, title=title, QgisTab=QgisTab, level=level, sep=sep)

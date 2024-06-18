@@ -1,3 +1,5 @@
+from qgis.core import QgsMessageLog, Qgis
+
 GRAVITY_MODEL_VAR_NAME = {
     'LAYER_CONSUMER': 0,
     'LAYER_SITE': 1,
@@ -22,3 +24,32 @@ CONFIG_VALIDATION_ERROR_MESSAGE = {
 EXPORT_FILE_FORMAT = {
     'csv': 'csv'
 }
+
+def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.Info, sep:str=' ') -> None:
+    """Log function for Qgis. Combine messages into one message and log.
+
+    Example:
+        log(myValue, 'Status:', myStatus, prefix='MyValue:', tab_name='My Values')
+
+        if isGood:
+            log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Success)
+        else:
+            log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Info)
+
+    Example output:
+        INFO MyValue: 200 Status: OK
+        SUCCESS InspectorClass: isGood: True
+
+    Args:
+        title (str, optional): title will appear first. Use for global information. Defaults to ''.
+        prefix (str, optional): note will appear before letter. Use for variable name when logging values. Defaults to ''.
+        tab_name (str, optional): If not None, QGIS will create separate log tab with given name. Defaults to ''.
+        level (Qgis.MessageLevel, optional): level of the message. Common levels: Info, Warning, Critical, Success. Defaults to Qgis.Info.
+        sep (str, optional): Default separate character. Defaults to ' '.
+    """
+    message = sep.join(map(str, messages))
+    if title:
+        title += sep
+    if prefix:
+        prefix += sep
+    QgsMessageLog.logMessage(title + prefix + message, tag=tab_name, level=level)

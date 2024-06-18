@@ -1,5 +1,6 @@
 from . import GRAVITY_MODEL_VAR_NAME as VAR, CONFIG_VALIDATION_ERROR_MESSAGE as ERR_MSG
-from helpers.logger import logger as log
+from . import log as log_function
+from functools import partial
 from qgis.core import QgsVectorLayer, QgsField, Qgis
 
 class GravityModelConfig:
@@ -12,6 +13,7 @@ class GravityModelConfig:
         self._beta: float = None
         self._distance_limit_meters: int = None
         self._errors: list[str] = []
+        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
 
     @property
     def layer_consumer(self):
@@ -42,15 +44,19 @@ class GravityModelConfig:
         return self._distance_limit_meters
     
     @property
-    def all_layers(self):
+    def all_params(self) -> tuple[QgsVectorLayer, QgsVectorLayer, QgsField, QgsField, float, float, int]:
+        return self.all_layers(), self.all_fields(), self.all_numeric_params()
+    
+    @property
+    def all_layers(self) -> tuple[QgsVectorLayer, QgsVectorLayer]:
         return self._layer_consumer, self._layer_site
     
     @property
-    def all_fields(self):
+    def all_fields(self) -> tuple[QgsField, QgsField]:
         return self._field_consumer, self._field_site
     
     @property
-    def all_numeric_params(self):
+    def all_numeric_params(self) -> tuple[float, float, int]:
         return self._alpha, self._beta, self.distance_limit_meters
     
     @property
@@ -68,39 +74,43 @@ class GravityModelConfig:
         return self.is_valid()
     
     def is_valid(self) -> bool:
+        is_valid = True
         def report(message):
             self._errors.append(message)
-            log(message, note='VALIDATION ERROR:', title=type(self).__name__, level=Qgis.Error)
+            self.log(message, note='VALIDATION ERROR:', level=Qgis.Critical)
+        
+        # Очистка прошлых ошибок
+        #
+        self._errors.clear()
         
         # Проверка на валидность данных конфига
         #
         if self._layer_consumer == None:
             report(ERR_MSG['bad layer_consumer'])
-            return False
+            is_valid = False
         
         if self._layer_site == None:
             report(ERR_MSG['bad layer_site'])
-            return False
+            is_valid =  False
         
         if self._field_consumer == None:
             report(ERR_MSG['bad field_consumer'])
-            return False
+            is_valid =  False
         
         if self._field_site == None:
             report(ERR_MSG['bad field_site'])
-            return False
+            is_valid =  False
         
         if self._alpha == None:
             report(ERR_MSG['bad alpha'])
-            return False
+            is_valid =  False
         
         if self._beta == None:
             report(ERR_MSG['bad beta'])
-            return False
+            is_valid =  False
         
         if self._distance_limit_meters == None:
             report(ERR_MSG['bad distance_limit_meters'])
-            return False
+            is_valid =  False
         
-        self._errors.clear()
-        return True
+        return is_valid

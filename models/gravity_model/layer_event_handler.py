@@ -1,6 +1,7 @@
 from PyQt5.QtCore import pyqtSignal
 from qgis.core import Qgis
-from helpers.logger import logger as log
+from functools import partial
+from . import log as log_function
 from .data_manager import GravityModelDataManager as DataManager
 
 class LayerEventHandler:
@@ -10,6 +11,7 @@ class LayerEventHandler:
         self._previous_layer = None
         self.iface = parent.iface
         self.data_manager: DataManager = parent.data_manager
+        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
         
         self.iface.currentLayerChanged.connect(self.on_active_layer_changed)
     
@@ -19,7 +21,7 @@ class LayerEventHandler:
         # Проверка существования gm_data файла для этого слоя
         is_gmlayer = self.data_manager.is_gmlayer(current_layer)
         if not is_gmlayer:
-            log('Unexpected layer type.', title=type(self).__name__, level=Qgis.Error)
+            self.log('Unexpected layer type.', level=Qgis.Critical)
             return
         
         # Новый активный слой
