@@ -25,36 +25,58 @@ LINE_LAYER_NAME = 'линии [g. m.]'
 
 
 class GravityModel(QObject):
-    
-    #
-    # TODO: Try Injector()
-    #
-    
-    def __init__(self, injector, parent=None):
-        super(GravityModel, self).__init__()
-        self.log('__init__() entered.')
-        
+    def __init__(self, parent=None):
+        super(GravityModel, self).__init__()        
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
+        
+        # Переопределение функции log()
         self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
 
+        # Инициализация полей
         self.ui_widget: GravityModelWidget = None
-        self.config = Config()
-        self.data_manager = DataManager(self)
-        self.diagram_manager = DiagramManager(self)
+        self.config: Config = None
+        self.data_manager: DataManager = None
+        self.diagram_manager: DiagramManager = None
         self.layer_event_handler: LayerEventHandler = None
         
-        self.init_ui()
-        
-    def init_ui(self):
-        self.log('init_ui() entered.')
+    @property
+    def ui_widget(self):
+        ui_widget = self.ui_widget
+        if not ui_widget:
+            self.ui_widget = GravityModelWidget(self)
+            self.ui_widget.ready.connect(self.go)
+            self.ui_widget.export.connect(self.export)
+        return ui_widget
     
-        self.ui_widget = GravityModelWidget(self)
-        self.ui_widget.ready.connect(self.go)
-        self.ui_widget.export.connect(self.export)
-        
-        self.layer_event_handler = LayerEventHandler(self)
-        self.layer_event_handler.feature_selection.connect(self.feature_selection)
+    @property
+    def config(self):
+        config = self.config
+        if not config:
+            config = Config()
+        return config
+    
+    @property
+    def data_manager(self):
+        data_manager = self.data_manager
+        if not data_manager:
+            data_manager = DataManager(self)
+        return data_manager
+    
+    @property
+    def diagram_manager(self):
+        diagram_manager = self.diagram_manager
+        if not diagram_manager:
+            diagram_manager = DiagramManager(self)
+        return diagram_manager
+    
+    @property
+    def layer_event_handler(self):
+        layer_event_handler = self.layer_event_handler
+        if not layer_event_handler:
+            layer_event_handler = LayerEventHandler(self)
+            self.layer_event_handler.feature_selection.connect(self.feature_selection)
+        return layer_event_handler
 
     def export(self, data_path: str, save_path: str, desired_extension: str):
         if desired_extension not in EXPORT_FILE_FORMAT:
@@ -73,7 +95,6 @@ class GravityModel(QObject):
             self.log('File export failed with exception: ', str(e), level=Qgis.Critical)
 
     def run(self):
-        self.log('run() entered.')
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
     
@@ -95,47 +116,46 @@ class GravityModel(QObject):
         if data_path == None:
             return
         
-        #           f_probability_values
+        # # #       f_probability_values
         center_ids, f_prob_values = self.data_manager.get_gravity_values_by_feature_id(data_path, f_id)
         
         center_values = []
         diagram_field = self.diagram_manager.selected_field
-        if diagram_field != None and not is_id_field(diagram_field): # TODO: is_id_field() for `id object`???
+        if diagram_field and not is_id_field(diagram_field): # TODO: is_id_field() for `id object`???
             for center in layer_centers.getFeatures():
                 center_values.append(center[diagram_field])
 
         center_values = map(str, center_values)
 
-        # Diagram data is dict where each value is dict:
+        # Diagram data is a list where each value is a tuple of 3:
         # center_id — ID центральной точки
         # c_value — Значение атрибута центральной точки. Атрибут выбран в diagram_field
         # f_prob_value — Значение вероятности, полученное в результате работы гравитационной модели
-        diagram_data = {}
+        diagram_data = []
         for c_id, c_value, f_prob_value in zip(center_ids, center_values, f_prob_values):
             if float(f_prob_value) != 0:
-                diagram_data[c_id] = {c_value: f_prob_value}
+                diagram_data.append((c_id, c_value, f_prob_value))
         
         # TODO: Список выбранных полей, вместо простого self.diagram_field
         # TODO: Выбор поля для универсальной идентификации? Если да, то центры, обладающие одинаковым полем идентификации,
-        # считаются как один, и их данные по вероятностям складываются?
+        #       считаются как один, и их данные по вероятностям складываются? НЕТ! Не очевидное поведение.
         #
         pie_diagram = self.diagram_manager.construct_pie(diagram_data)
         
+        # TODO: self.ui_widget.update(pie_diagram)?
         self.diagram_manager.update(pie_diagram)
         
-        # выделение линий от потребителя к поставщикам
+        # Выделение линий от потребителей к поставщикам.
         line_layer: QgsVectorLayer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
         line_layer.selectByExpression(f'"f_id"={f_id}', QgsVectorLayer.SetSelection)
         
-        # OLD VERSION:
+        # Выделение линий от потребителей к поставщикам OLD VERSION:
         # line_layer: QgsVectorLayer = QgsProject.instance().mapLayersByName(LINE_LAYER_NAME)[0]
         # request: QgsFeatureRequest = QgsFeatureRequest().setFilterExpression(f'"f_id"={f_id}')
         # line_ids: list[str] = [line.id() for line in line_layer.getFeatures(request)]
         # line_layer.selectByIds(line_ids)
         
-    def go(self, input_data):
-        self.log('go() entered.')
-        
+    def go(self, input_data):        
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
         LAYER_GROUP_NAME = 'Гравитационная модель'
         
@@ -182,7 +202,7 @@ class GravityModel(QObject):
             point = feature.geometry().asPoint()
             lat, long = point.y(), point.x()
             if lat == None or long == None:
-                log('Не вышло получить координаты точки.')
+                self.log('Не вышло получить координаты точки.', level=Qgis.Critical)
                 return None
             return lat, long
 
@@ -218,26 +238,26 @@ class GravityModel(QObject):
         layer_attr, layer_attr_tc,
         alpha, beta, max_distance) = self.config.all_params()
 
-        # создаем точечный слой поставщиков
+        # Создаем точечный слой поставщиков
         layer_tc = create_point_layer(layer_tc)
 
-        # создаем точечный слой потребителей
+        # Создаем точечный слой потребителей
         layer = create_point_layer(layer)
 
-        # создаем линейный слой зоны влияния центра
+        # Создаем линейный слой зоны влияния центра
         line_layer = create_line_layer(layer)
         line_layer_provider = line_layer.dataProvider()
         
-        # добавляем слои в проект
+        # Добавляем слои в проект
         project = QgsProject.instance()
         project.addMapLayers([layer_tc, layer, line_layer], False)
 
-        # добавляем поле 'weight'
+        # Добавляем поле 'weight'
         if layer_tc.fields().indexFromName(WEIGHT_FIELD_NAME) == -1: 
             layer_tc.dataProvider().addAttributes([QgsField(WEIGHT_FIELD_NAME, QVariant.Double)])
             layer_tc.updateFields()
         
-        # для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
+        # Для каждой точки делаем рассчет по формуле и записываем результат в слой в соответствующие поля
         # https://en.wikipedia.org/wiki/Huff_model
         data = []
         for f in list(layer.getFeatures()):
@@ -313,7 +333,7 @@ class GravityModel(QObject):
         layer_tc.triggerRepaint()
 
         # Создаем группу и помещаем туда слои
-        # might use group.children().__len__()
+        # may use group.children().__len__() for index
         group = QgsLayerTreeGroup(LAYER_GROUP_NAME)
         group.insertChildNode(0, QgsLayerTreeLayer(layer_tc))
         group.insertChildNode(1, QgsLayerTreeLayer(layer))
@@ -323,8 +343,5 @@ class GravityModel(QObject):
         root = project.layerTreeRoot()
         root.insertChildNode(0, group)
 
-        # Устанавливаем активный слой
+        # Выбираем слой потребителей активным
         self.iface.setActiveLayer(layer)
-
-# def log(msg, note='', title=type(GravityModel).__name__, QgisTab=None, level=Qgis.Info, sep=' '):
-#    logger(msg, note=note, title=title, QgisTab=QgisTab, level=level, sep=sep)

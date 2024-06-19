@@ -2,9 +2,8 @@ import os
 from PyQt5.QtCore import pyqtSignal
 from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.PyQt import QtWidgets, uic
-from qgis.core import QgsLayerTreeNode, QgsMapLayerProxyModel, Qgis, QgsProject
+from qgis.core import QgsMapLayerProxyModel, Qgis
 from functools import partial
-from .data_manager import GravityModelDataManager
 from . import log as log_function
 from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
 
@@ -22,19 +21,14 @@ TAB_INDEX = {
     'export': 2,
 }
 
-SERVICE = {
-    'config': 'config',
-    'data_manager':'data_manager',
-}
-
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
     export = pyqtSignal(str, str, str)
     diagram_field_selected = pyqtSignal(str)
     
-    def __init__(self, injector, parent=None):
+    def __init__(self, parent=None):
         super(GravityModelWidget, self).__init__()
-        self.data_manager: GravityModelDataManager = self.injector.get(SERVICE['data_manager'])
+        self.data_manager = parent.data_manager
         self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
         
         self.setupUi(self)
@@ -113,7 +107,9 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         return layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters
 
     def ok(self):
-        layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters = self.get_input()
+        (layer_consumer, layer_site,
+         field_consumer, field_site,
+         alpha, beta, distance_limit_meters) = self.get_input()
         
         input_data = {
             VAR['LAYER_CONSUMER']: layer_consumer,
@@ -129,7 +125,7 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def export(self):
         desired_extension = self.cmbox_file_format
-        if desired_extension in EXPORT_FILE_FORMAT.values():
+        if desired_extension in EXPORT_FILE_FORMAT:
             save_path = QFileDialog.getSaveFileName(self,
                                             'Выберите директорию для экспорта',
                                             "", 'CSV (*.csv)')
