@@ -9,7 +9,6 @@ from qgis.core import (
     QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer, QgsProject, QgsTask, QgsApplication, 
     QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer, QgsApplication, QgsTask, Qgis, QgsMessageLog
 )
-
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from . import log as log_function
@@ -18,7 +17,6 @@ from .diagram_manager import GravityModelDiagramManager as DiagramManager
 from .config import GravityModelConfig as Config
 from .layer_event_handler import LayerEventHandler
 from .widget import GravityModelWidget
-import os
 import math
 import shutil
 
@@ -27,7 +25,12 @@ LINE_LAYER_NAME = 'линии [g. m.]'
 
 
 class GravityModel(QObject):
-    def __init__(self, parent=None):
+    
+    #
+    # TODO: Try Injector()
+    #
+    
+    def __init__(self, injector, parent=None):
         super(GravityModel, self).__init__()
         self.log('__init__() entered.')
         
@@ -53,17 +56,19 @@ class GravityModel(QObject):
         self.layer_event_handler = LayerEventHandler(self)
         self.layer_event_handler.feature_selection.connect(self.feature_selection)
 
-    def export(self, dir_path: str, file_name: str, file_format: str):
-        if file_format not in EXPORT_FILE_FORMAT:
+    def export(self, data_path: str, save_path: str, desired_extension: str):
+        if desired_extension not in EXPORT_FILE_FORMAT:
             self.log('Export failed. Unexpected file format.', level=Qgis.Critical)
             return
         
-        # TODO: Как определять source? Из cmb на виджете, но по умолчанию текущая группа
-        source = self.data_manager.get…
-        destination = os.path.join(dir_path, file_name)
+        # TODO:
+        # source = #??? source test ???
+        # destination = save_path #??? desired_extension ???
         
         try:
-            shutil.copy(source, destination)
+            # Копируем data_path —> save_path.  # (source) —> (destination)
+            shutil.copy(data_path, save_path)
+            self.log('File exported successfully.', level=Qgis.Success)
         except Exception as e:
             self.log('File export failed with exception: ', str(e), level=Qgis.Critical)
 

@@ -1,10 +1,11 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QToolButton, QInputDialog, QMessageBox, QDockWidget
-from qgis.PyQt import QtGui, QtWidgets, uic
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtCore import Qt, pyqtSignal, QObject
-from qgis.PyQt.QtGui import QIcon
-from qgis.core import QgsMapLayerProxyModel
 import os
+from PyQt5.QtCore import pyqtSignal
+from qgis.PyQt.QtWidgets import QFileDialog
+from qgis.PyQt import QtWidgets, uic
+from qgis.core import QgsLayerTreeNode, QgsMapLayerProxyModel, Qgis, QgsProject
+from functools import partial
+from .data_manager import GravityModelDataManager
+from . import log as log_function
 from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -15,18 +16,34 @@ LAYER_CMBOX_NAME = {
     'site':'site',
 }
 
+TAB_INDEX = {
+    'analysis': 0,
+    'diagram': 1,
+    'export': 2,
+}
+
+SERVICE = {
+    'config': 'config',
+    'data_manager':'data_manager',
+}
+
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
     export = pyqtSignal(str, str, str)
     diagram_field_selected = pyqtSignal(str)
     
-    def __init__(self, parent=None):
+    def __init__(self, injector, parent=None):
         super(GravityModelWidget, self).__init__()
+        self.data_manager: GravityModelDataManager = self.injector.get(SERVICE['data_manager'])
+        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
         
         self.setupUi(self)
         self.init_ui()
 
     def init_ui(self):
+        # Инициализация cmbox с допустимыми форматами файлов для экспорта
+        self.cmbox_file_format.addItems(EXPORT_FILE_FORMAT.values())
+        
         # Обновление field_cmbox при выборе слоя
         self.cmbox_consumer_layer.currentIndexChanged.connect(
             lambda: self.update_field_cmbox(LAYER_CMBOX_NAME['consumer']))
@@ -44,6 +61,8 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.btn_ok.clicked.connect(self.ok)
         
         self.btn_export.clicked.connect(self.export)
+        
+        self.tab_widget.currentChanged.connect(self.update_layer_pair_cmbox)
         
     def update_field_cmbox(self, layer_cmbox_name: str):
         cmbox_layer, cmbox_field = {
@@ -63,6 +82,12 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         cmbox_field.clear()
         cmbox_field.addItems(field_names)
+
+    def update_layer_pair_cmbox(self, index):   # TODO: Эта функция может быть умнее.
+        self.cmbox_layer_pair.clear()           # Например, не очищать cmbox, если не изменился активный слой или содержимое папки data/
+        if index == TAB_INDEX['export']:
+            for layer1_name, layer2_name in self.data_manager.get_all_layer_pair_names():
+                self.cmbox_layer_pair.addItem(' — '.join(layer1_name, layer2_name))
 
     def get_input(self):
         def get_field(layer, field_name):
@@ -105,11 +130,18 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def export(self):
         desired_extension = self.cmbox_file_format
         if desired_extension in EXPORT_FILE_FORMAT.values():
-            # TODO: Диалоговое окно с выбором путя к файлу и имени.
-            dir_path = 
-            file_name = 
-            self.export.emit(dir_path, file_name, desired_extension)
-            return
+            save_path = QFileDialog.getSaveFileName(self,
+                                            'Выберите директорию для экспорта',
+                                            "", 'CSV (*.csv)')
+            
+            layer_pair = self.cmbox_layer_pair
+            [layer1_name, layer2_name] = layer_pair.split(' — ') # TODO: Переписать. Данные item'ов QLayerCombobox можно кастомизировать
+            
+            data_path = … # TODO: Узазатель на выбранный файл для экспорта
+            
+            if save_path:
+                self.export.emit(data_path, save_path, desired_extension)
+                self.log("Экспорт файла...", Qgis.Success)
 
     # def d(self):
     #     var = 

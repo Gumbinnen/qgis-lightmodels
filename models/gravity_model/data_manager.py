@@ -1,3 +1,4 @@
+from typing import Generator, Tuple
 from typing_extensions import deprecated
 from qgis.core import QgsProject, QgsVectorLayer
 import os, csv
@@ -10,7 +11,7 @@ class GravityModelDataManager:
         
     @property
     def dir_exists(self) -> bool:
-        path = os.path.join(self.plugin_dir, 'temp', 'gravity_model_data')
+        path = os.path.join(self.plugin_dir, 'data', 'gravity_model_data')
         return os.path.exists(path), path
         
     def create_dir(self):
@@ -37,6 +38,13 @@ class GravityModelDataManager:
     def file_exists(self, path) -> bool:
         return os.path.exists(path)
 
+    def get_all_layer_pair_names(self) -> Generator[Tuple[str, str], None, None]:
+        files = self._dir
+        for file in files:
+            layer1, layer2 = self.get_layer_pair_if_exists(file)
+            if layer1 and layer2:
+                yield layer1.name, layer2.name
+            
     def get_data_path_if_exists(self, layer1, layer2):
         file_name = f"{layer1.id()}&{layer2.id()}.csv"
         data_path = os.path.join(self._dir, file_name)
@@ -85,15 +93,15 @@ class GravityModelDataManager:
         layer2 = QgsProject.instance().mapLayer(layer2_id)
         return layer1, layer2
     
-    def get_second_layer(self, first_layer_id):
+    def get_second_layer(self, first_layer_id: QgsVectorLayer | str) -> QgsVectorLayer | None:
         if isinstance(first_layer_id, QgsVectorLayer):
             first_layer_id = first_layer_id.id()
-        if isinstance(first_layer_id, int):
+        if isinstance(first_layer_id, str):
             layer_id = self.get_second_layer_id(first_layer_id)
             layer = QgsProject.instance().mapLayer(layer_id)
             return layer
     
-    def get_second_layer_id(self, first_layer_id):
+    def get_second_layer_id(self, first_layer_id: str) -> str | None:
         files = self._dir
         for file in files:
             file_name = os.path.basename(file)
