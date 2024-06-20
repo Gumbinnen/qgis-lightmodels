@@ -1,10 +1,13 @@
+from qgis.core import QgsProject, QgsVectorLayer
 from typing import Generator, Tuple
 from typing_extensions import deprecated
-from qgis.core import QgsProject, QgsVectorLayer
 import os, csv
 
+from .gravity_model import GravityModel
+
+
 class GravityModelDataManager:
-    def __init__(self, parent=None):
+    def __init__(self, parent: GravityModel=None):
         self.plugin_dir = parent.plugin_dir
         
         self._dir = self.create_dir()

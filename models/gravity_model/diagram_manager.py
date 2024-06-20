@@ -1,11 +1,17 @@
-from .colors import BLUE_PALETTES
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .widget import GravityModelWidget
+from . import connect_once
+from .colors import BLUE_PALETTES
+
+
 # TODO: USE FIELDS / PROPERTIES INSTEAD OF CONSTANS?
 DIAGRAM_TITLE = 'Распределение потребителей среди поставщиков'
 DIAGRAM_TITLE_PARAMS = dict(fontsize=10, pad=40)
+
+SUBPLOT_ADJUSTMENT = dict(top=0.77, bottom=0.15, left=0.0, right=1)
 
 PIE_PARAMS = dict(
     colors=BLUE_PALETTES['light_blue'], startangle = 0,
@@ -18,22 +24,26 @@ ANNOTATION_PARAMS = dict(
     bbox=dict(boxstyle='round,pad=0.3', edgecolor='None', fc="w", ec="k", lw=0.72)
 )
 
-SUBPLOT_ADJUSTMENT = dict(top=0.77, bottom=0.15, left=0.0, right=1)
-
 ON_CLICK_STYLE_PARAMS = dict(alpha=0.35, linewidth=1, zorder=1, dull_alpha=0.35, accent_linewidth=2, accent_zorder=2)
 
 
 class GravityModelDiagramManager:
-    def __init__(self, parent=None):
+    def __init__(self, ui_widget: GravityModelWidget=None):
         self._selected_field = None
+        self._selected_uid_field = None
         self._diagram_highlighted = False
         
-        self.ui_widget = parent.ui_widget
-        self.ui_widget.diagram_field_selected.connect(self.new_diagram_field)
+        self.ui_widget = ui_widget
+        connect_once(self.ui_widget.diagram_field_selected, self.new_diagram_field)
+        connect_once(self.ui_widget.diagram_uid_field_selected, self.new_diagram_uid_field)
 
     @property
     def selected_field(self):
         return self._selected_field
+    
+    @property
+    def selected_uid_field(self):
+        return 'id' # TODO: self._selected_uid_field
     
     @property
     def diagram_highlight_state(self):
@@ -41,6 +51,9 @@ class GravityModelDiagramManager:
     
     def new_diagram_field(self, field_name):
         self._selected_field = field_name
+        
+    def new_diagram_uid_field(self, field_name):
+        self._selected_uid_field = field_name
 
     def update(self, diagram_canvas):
         if self.ui_widget.diagram_layout.count() > 0:
@@ -52,6 +65,9 @@ class GravityModelDiagramManager:
     def construct_pie(self, diagram_data):
         def percentage(part, whole):
             return 100 * float(part) / float(whole)
+
+        def validate_name(name):
+            return name
 
         def apply_styles_to_all(wedge_style_params, annotation_style_params, bbox_alpha):
             for annotation in annotations:
@@ -193,7 +209,7 @@ class GravityModelDiagramManager:
         prob_values = [item[2] for item in diagram_data]    # Список значений вероятности. Другими словами, доли значения поля center_value в diagram_data
         prob_values_sum = sum(prob_values)
         
-        # Новые названия для значений data_diagram.
+        # Новые названия для значений diagram_data.
         #
         u_ids = center_ids
         value_texts = center_values
@@ -223,11 +239,8 @@ class GravityModelDiagramManager:
             text_y = 1.4*y
             annotation_params.update(dict(xy=(x, y), xytext=(text_x, text_y)))
 
-            # TODO: set self._uid_field and self._selected_field
-            # TODO: what is in self._uid_field and self._selected_field?
-            # TODO: create get_name() or smth
-            uid_name = get_name(self._uid_field)
-            value_text_name = get_name(self._selected_field)
+            uid_name = validate_name(self.selected_uid_field)
+            value_text_name = validate_name(self.selected_field)
             
             #!! Order matters!
             format_vars = (uid_name, u_id), (value_text_name, value_text), value_pct

@@ -1,82 +1,53 @@
 from PyQt5.QtCore import Qt, QObject, QVariant
-# from qgis.PyQt.QtCore import QVariant
-
-# from qgis.core import *
-# For the sake of convinience.
-from qgis.core import (
-    QgsField, QgsProject, QgsVectorLayer, QgsLayerTreeLayer, QgsVectorFileWriter, QgsRendererRange,
-    QgsLayerTreeGroup, QgsGraduatedSymbolRenderer, QgsGeometry, QgsPoint, QgsFeature, QgsWkbTypes, QgsCoordinateTransformContext,
-    QgsSymbol, QgsSpatialIndex, QgsRendererCategory, QgsSingleSymbolRenderer, QgsProject, QgsTask, QgsApplication, 
-    QgsMarkerSymbol, QgsFeatureRequest, QgsCategorizedSymbolRenderer, QgsApplication, QgsTask, Qgis, QgsMessageLog
-)
-from concurrent.futures import ThreadPoolExecutor
+from QtGui import QColor
+from qgis.core import *
 from functools import partial
-from . import log as log_function
+import math, shutil
+
+from light_models import LightModels
 from .data_manager import GravityModelDataManager as DataManager
 from .diagram_manager import GravityModelDiagramManager as DiagramManager
 from .config import GravityModelConfig as Config
 from .layer_event_handler import LayerEventHandler
 from .widget import GravityModelWidget
-import math
-import shutil
-
+from . import connect_once, log as log_function
 from . import EXPORT_FILE_FORMAT
+
+
 LINE_LAYER_NAME = 'линии [g. m.]'
 
 
 class GravityModel(QObject):
-    def __init__(self, parent=None):
-        super(GravityModel, self).__init__()        
+    def __init__(self, parent: LightModels=None):
+        super(GravityModel, self).__init__()
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
         
         # Переопределение функции log()
-        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
+        self.log = partial(log_function, title=type(self).__name__, tab_name='LightModels')
 
-        # Инициализация полей
+        # Инициализация полей сервисов
         self.ui_widget: GravityModelWidget = None
         self.config: Config = None
         self.data_manager: DataManager = None
         self.diagram_manager: DiagramManager = None
         self.layer_event_handler: LayerEventHandler = None
+        self.init_services()
+        self.connect_signals()
         
-    @property
-    def ui_widget(self):
-        ui_widget = self.ui_widget
-        if not ui_widget:
-            self.ui_widget = GravityModelWidget(self)
-            self.ui_widget.ready.connect(self.go)
-            self.ui_widget.export.connect(self.export)
-        return ui_widget
-    
-    @property
-    def config(self):
-        config = self.config
-        if not config:
-            config = Config()
-        return config
-    
-    @property
-    def data_manager(self):
-        data_manager = self.data_manager
-        if not data_manager:
-            data_manager = DataManager(self)
-        return data_manager
-    
-    @property
-    def diagram_manager(self):
-        diagram_manager = self.diagram_manager
-        if not diagram_manager:
-            diagram_manager = DiagramManager(self)
-        return diagram_manager
-    
-    @property
-    def layer_event_handler(self):
-        layer_event_handler = self.layer_event_handler
-        if not layer_event_handler:
-            layer_event_handler = LayerEventHandler(self)
-            self.layer_event_handler.feature_selection.connect(self.feature_selection)
-        return layer_event_handler
+    def init_services(self):
+        #! Порядок инициализации важен!
+        self.config = Config()
+        self.data_manager = DataManager(parent=self)
+        self.ui_widget = GravityModelWidget(data_manager=self.data_manager)
+        self.diagram_manager = DiagramManager(ui_widget=self.ui_widget)
+        self.layer_event_handler = LayerEventHandler(parent=self, data_manager=self.data_manager)
+        
+    def connect_signals(self):
+        connect_once(self.ui_widget.ready, self.go)
+        connect_once(self.ui_widget.export, self.export)
+        
+        connect_once(self.layer_event_handler.feature_selection, self.feature_selection)
 
     def export(self, data_path: str, save_path: str, desired_extension: str):
         if desired_extension not in EXPORT_FILE_FORMAT:
@@ -90,7 +61,6 @@ class GravityModel(QObject):
         try:
             # Копируем data_path —> save_path.  # (source) —> (destination)
             shutil.copy(data_path, save_path)
-            self.log('File exported successfully.', level=Qgis.Success)
         except Exception as e:
             self.log('File export failed with exception: ', str(e), level=Qgis.Critical)
 
@@ -98,7 +68,7 @@ class GravityModel(QObject):
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.ui_widget)
         self.ui_widget.show()
     
-    def feature_selection(self):
+    def feature_selection(self): # TODO: LayerEventHandler could return selection_ids, so code could be optimized
         layer = self.iface.activeLayer()
         selection_ids = layer.selectedFeatureIds()
         
@@ -109,20 +79,23 @@ class GravityModel(QObject):
         f_id = selection_ids[0]
         
         layer_centers = self.data_manager.get_second_layer(layer)
-        if layer_centers == None:
+        if not layer_centers:
             return
         
         data_path = self.data_manager.get_data_path_if_exists(layer, layer_centers)
-        if data_path == None:
+        if not data_path:
             return
+        
+        def is_id_field(field):
+            return field == 'id'
         
         # # #       f_probability_values
         center_ids, f_prob_values = self.data_manager.get_gravity_values_by_feature_id(data_path, f_id)
         
         center_values = []
         diagram_field = self.diagram_manager.selected_field
-        if diagram_field and not is_id_field(diagram_field): # TODO: is_id_field() for `id object`???
-            for center in layer_centers.getFeatures():
+        if diagram_field and not is_id_field(diagram_field):    # TODO: Установка пользователем кастомного id для center_ids 
+            for center in layer_centers.getFeatures():          # (др. словами, добавление пользователем списка кастомных полей идентификации)
                 center_values.append(center[diagram_field])
 
         center_values = map(str, center_values)
@@ -137,8 +110,10 @@ class GravityModel(QObject):
                 diagram_data.append((c_id, c_value, f_prob_value))
         
         # TODO: Список выбранных полей, вместо простого self.diagram_field
-        # TODO: Выбор поля для универсальной идентификации? Если да, то центры, обладающие одинаковым полем идентификации,
-        #       считаются как один, и их данные по вероятностям складываются? НЕТ! Не очевидное поведение.
+        # TODO: 1. Выбор поля для универсальной идентификации? 2. Центры, обладающие одинаковым полем идентификации,
+        #       считаются как один, и их данные по вероятностям складываются?
+        #       1) Под вопросом.
+        #       2) НЕТ! Не очевидное поведение.
         #
         pie_diagram = self.diagram_manager.construct_pie(diagram_data)
         

@@ -1,11 +1,14 @@
-import os
 from PyQt5.QtCore import pyqtSignal
 from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.PyQt import QtWidgets, uic
 from qgis.core import QgsMapLayerProxyModel, Qgis
 from functools import partial
+import os
+
+from .data_manager import GravityModelDataManager
 from . import log as log_function
 from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
+
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'res', 'ui', 'gravity_model_dockwidget.ui'))
@@ -21,15 +24,17 @@ TAB_INDEX = {
     'export': 2,
 }
 
+
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
     export = pyqtSignal(str, str, str)
     diagram_field_selected = pyqtSignal(str)
+    diagram_uid_field_selected = pyqtSignal(str)
     
-    def __init__(self, parent=None):
+    def __init__(self, data_manager: GravityModelDataManager=None):
         super(GravityModelWidget, self).__init__()
-        self.data_manager = parent.data_manager
-        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
+        self.data_manager = data_manager
+        self.log = partial(log_function, title=type(self).__name__, tab_name='LightModels')
         
         self.setupUi(self)
         self.init_ui()

@@ -1,10 +1,11 @@
-from . import GRAVITY_MODEL_VAR_NAME as VAR, CONFIG_VALIDATION_ERROR_MESSAGE as ERR_MSG
-from . import log as log_function
-from functools import partial
 from qgis.core import QgsVectorLayer, QgsField, Qgis
+from functools import partial
+from . import log as log_function
+from . import GRAVITY_MODEL_VAR_NAME as VAR, CONFIG_VALIDATION_ERROR_MESSAGE as ERR_MSG
+
 
 class GravityModelConfig:
-    def __init__(self, parent=None):
+    def __init__(self):
         self._layer_consumer: QgsVectorLayer = None
         self._layer_site: QgsVectorLayer = None
         self._field_consumer: QgsField = None
@@ -13,7 +14,7 @@ class GravityModelConfig:
         self._beta: float = None
         self._distance_limit_meters: int = None
         self._errors: list[str] = []
-        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
+        self.log = partial(log_function, title=type(self).__name__, tab_name='LightModels')
 
     @property
     def layer_consumer(self):
