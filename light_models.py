@@ -1,38 +1,16 @@
-import itertools
-from sys import dllhandle
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QVariant
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from .resources import *
-from .LightModels_dockwidget import ModelsDockWidget
-from .my_plugin_dialog import MyPluginDialog
-from .gravity_dialog import GravityDialog
-import os.path
-from PyQt5 import QtCore, QtGui, QtWidgets
 from qgis.core import *
-from qgis.core import (
-    QgsProject, QgsMapLayer, QgsWkbTypes, QgsVectorLayer, QgsField, QgsFeature, QgsPoint,
-    QgsLayerTreeGroup, QgsLayerTreeLayer, QgsGeometry, QgsGraduatedSymbolRenderer, QgsMessageLog, Qgis,
-    QgsFeatureRequest, QgsSpatialIndex, QgsSymbol, QgsCategorizedSymbolRenderer, QgsCoordinateTransformContext,
-    QgsSingleSymbolRenderer, QgsMarkerSymbol, QgsRendererCategory, QgsCoordinateReferenceSystem, QgsCoordinateTransform
-)
-from helpers.logger import logger as log
-import shutil
-from qgis.PyQt.QtWidgets import QFileDialog
-from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
-import time 
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import csv
+from gui import QgisInterface
+import os.path
+
+from .resources import *
 from models.gravity_model.gravity_model import GravityModel
-import os
-import math
 
 
-class Models:
-    def __init__(self, iface):
+class LightModels:
+    def __init__(self, iface: QgisInterface):
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
         
@@ -52,10 +30,13 @@ class Models:
         self.actions = []
         self.menu = self.tr(u'&LightModels')
         # TODO: We are going to let the user set this up in a future iteration
-        self.toolbar = self.iface.addToolBar(u'Models')
-        self.toolbar.setObjectName(u'Models')
+        self.toolbar = self.iface.addToolBar(u'LightModels')
+        self.toolbar.setObjectName(u'LightModels')
         
+        # Model fields
         self.gravity_model = None
+        self.center_places_model = None
+        self.regression_model = None
         
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -70,7 +51,7 @@ class Models:
         :rtype: QString
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('Models', message)
+        return QCoreApplication.translate('LightModels', message)
     
     def add_action(
             self,
@@ -138,18 +119,21 @@ class Models:
     
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-        gravity_icon_path = os.path.join(self.plugin_dir, 'res', 'icons', 'gravity_model_icon.png')
-        regression_icon_path = os.path.join(self.plugin_dir, 'res', 'icons', 'gravity_model_icon.png')
-        centers_model_icon_path = os.path.join(self.plugin_dir, 'res', 'icons', 'gravity_model_icon.png')
+        icons_dir = os.path.join(self.plugin_dir, 'res', 'icons')
         self.add_action(
-            icon_path=gravity_icon_path,
+            icon_path=os.path.join(icons_dir, 'gravity_model_icon.png'),
             text=self.tr(u'Гравитационная модель'),
             callback=self.run_gravity_model,
             parent=self.iface.mainWindow())
         self.add_action(
-            icon_path=centers_model_icon_path,
+            icon_path=os.path.join(icons_dir, 'center_places_model_icon.png'),
             text=self.tr(u'Модель центральных мест'),
-            callback=self.run_centers_model,
+            callback=self.run_center_places_model,
+            parent=self.iface.mainWindow())
+        self.add_action(
+            icon_path=os.path.join(icons_dir, 'regression_model_icon.png'),
+            text=self.tr(u'Регрессионная модель'),
+            callback=self.run_cregression_model,
             parent=self.iface.mainWindow())
         
     def unload(self):
@@ -161,5 +145,11 @@ class Models:
         del self.toolbar
 
     def run_gravity_model(self):
-        self.gravity_model = GravityModel(self)
+        self.gravity_model = GravityModel(parent=self)
         self.gravity_model.run()
+
+    def run_center_places_model(self):
+        ...
+        
+    def run_regression_model(self):
+        ...

@@ -1,38 +1,24 @@
-import itertools
-from sys import dllhandle
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QVariant
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
-from .resources import *
-from .LightModels_dockwidget import ModelsDockWidget
-from .my_plugin_dialog import MyPluginDialog
-from .gravity_dialog import GravityDialog
-import os.path
-from PyQt5 import QtCore, QtGui, QtWidgets
-from qgis.core import *
-from qgis.core import (
-    QgsProject, QgsMapLayer, QgsWkbTypes, QgsVectorLayer, QgsField, QgsFeature, QgsPoint,
-    QgsLayerTreeGroup, QgsLayerTreeLayer, QgsGeometry, QgsGraduatedSymbolRenderer, QgsMessageLog, Qgis,
-    QgsFeatureRequest, QgsSpatialIndex, QgsSymbol, QgsCategorizedSymbolRenderer, QgsCoordinateTransformContext,
-    QgsSingleSymbolRenderer, QgsMarkerSymbol, QgsRendererCategory, QgsCoordinateReferenceSystem, QgsCoordinateTransform
-)
-import shutil
-from qgis.PyQt.QtWidgets import QFileDialog
-from qgis.utils import iface
-from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
-import time
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import numpy as np
-import csv
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import os
-import math
+import os, time, math, csv, itertools, shutil
+
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QVariant
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QAction, QFileDialog
+from qgis.core import *
+from qgis.utils import iface
+from gui import QgisInterface
+from concurrent.futures import ThreadPoolExecutor
+
+from .resources import *
+from .models.gravity_model.gravity_model import GravityModel
+from .my_plugin_dialog import MyPluginDialog
+from .gravity_dialog import GravityDialog
 
 
-# реализация плагина
-class Models:
-    def __init__(self, iface):
+class LightModel:
+    def __init__(self, iface: QgisInterface):
         self.iface = iface
 
         self.plugin_dir = os.path.dirname(__file__)
@@ -53,8 +39,8 @@ class Models:
         self.actions = []
         self.menu = self.tr(u'&LightModels')
         # TODO: We are going to let the user set this up in a future iteration
-        self.toolbar = self.iface.addToolBar(u'Models')
-        self.toolbar.setObjectName(u'Models')
+        self.toolbar = self.iface.addToolBar(u'LightModels')
+        self.toolbar.setObjectName(u'LightModels')
 
         # print "** INITIALIZING Models"
 
@@ -88,7 +74,7 @@ class Models:
         :rtype: QString
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('Models', message)
+        return QCoreApplication.translate('LightModels', message)
 
 
     def add_action(
@@ -160,15 +146,20 @@ class Models:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-        icon_path = ':/plugins/LightModels/regression_icon.png'
+        icons_dir = os.path.join(self.plugin_dir, 'res', 'icons')
         self.add_action(
-            self.plugin_dir + '/gravity_icon.png',
+            icon_path=os.path.join(icons_dir, 'gravity_model_icon.png'),
             text=self.tr(u'Гравитационная модель'),
             callback=self.run_gravity_dialog,
             parent=self.iface.mainWindow())
         self.add_action(
-            self.plugin_dir + '/regression_icon.png',
+            icon_path=os.path.join(icons_dir, 'center_places_model_icon.png'),
             text=self.tr(u'Модель центральных мест'),
+            callback=self.run_centers_dialog,
+            parent=self.iface.mainWindow())
+        self.add_action(
+            icon_path=os.path.join(icons_dir, 'regression_model_icon.png'),
+            text=self.tr(u'Регрессионная модель'),
             callback=self.run_centers_dialog,
             parent=self.iface.mainWindow())
 
