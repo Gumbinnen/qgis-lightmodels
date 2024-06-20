@@ -1,5 +1,3 @@
-from qgis.core import QgsMessageLog, Qgis
-
 GRAVITY_MODEL_VAR_NAME = {
     'LAYER_CONSUMER': 0,
     'LAYER_SITE': 1,
@@ -25,8 +23,11 @@ EXPORT_FILE_FORMAT = {
     'csv': 'csv'
 }
 
+
+from qgis.core import QgsMessageLog, Qgis
+
 def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.Info, sep:str=' ') -> None:
-    """Log function for Qgis. Combine messages into one message and log.
+    """Log function for Qgis. Combine messages into one message.
 
     Example:
         log(myValue, 'Status:', myStatus, prefix='MyValue:', tab_name='My Values')
@@ -53,3 +54,33 @@ def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.In
     if prefix:
         prefix += sep
     QgsMessageLog.logMessage(title + prefix + message, tag=tab_name, level=level)
+
+
+def connect_once(call, action, *extra_args, **extra_kwargs) -> None: #: TODO: USE LAMBDA ONLY without *extra_args, **extra_kwargs?
+    """Гарантирует единственное подключение одного сигнала или вызова функции к другому.
+    
+
+    pyqtSignal —> Callable
+    
+    Callable —> pyqtSignal
+    
+    etc.
+    """
+    # Wrapper function that will pass the signal arguments along with extra_args and extra_kwargs
+    def wrapper(*args, **kwargs):
+        action(*args, *extra_args, **kwargs, **extra_kwargs) #? TODO: What if I don't want action to receive args from call?
+    
+    try:
+        call.disconnect(wrapper) #? TODO: Replace wrapper with action?
+    except AttributeError:
+        # This is expected if the connection does not exist
+        pass
+    call.connect(wrapper)
+
+def disconnect_safe(call, action) -> None:
+    """Гарантирует отключение одного сигнала или вызова функции от другого без возникновения исключений."""
+    try:
+        call.disconnect(action)
+    except AttributeError:
+        # This is expected if the connection does not exist
+        pass
