@@ -16,7 +16,7 @@ import unittest
 
 from qgis.PyQt.QtGui import QDockWidget
 
-from LightModels_dockwidget import ModelsDockWidget
+from OLD.LightModels_dockwidget import ModelsDockWidget
 
 from utilities import get_qgis_app
 

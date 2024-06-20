@@ -11,10 +11,10 @@ from qgis.utils import iface
 from gui import QgisInterface
 from concurrent.futures import ThreadPoolExecutor
 
-from .resources import *
-from .models.gravity_model.gravity_model import GravityModel
-from .my_plugin_dialog import MyPluginDialog
-from .gravity_dialog import GravityDialog
+from ..resources import *
+from ..models.gravity_model.gravity_model import GravityModel
+from .OLD.my_plugin_dialog import MyPluginDialog
+from ..gravity_dialog import GravityDialog
 
 
 class LightModel:
