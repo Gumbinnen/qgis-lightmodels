@@ -1,10 +1,10 @@
-from PyQt5.QtCore import Qt, QObject, QVariant
-from QtGui import QColor
+from qgis.PyQt.QtCore import Qt, QObject, QVariant
+from qgis.PyQt.QtGui import QColor
 from qgis.core import *
 from functools import partial
 import math, shutil
 
-from light_models import LightModels
+from ... import ILightModel
 from .data_manager import GravityModelDataManager as DataManager
 from .diagram_manager import GravityModelDiagramManager as DiagramManager
 from .config import GravityModelConfig as Config
@@ -18,7 +18,7 @@ LINE_LAYER_NAME = 'линии [g. m.]'
 
 
 class GravityModel(QObject):
-    def __init__(self, parent: LightModels=None):
+    def __init__(self, parent: ILightModel=None):
         super(GravityModel, self).__init__()
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir

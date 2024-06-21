@@ -2,12 +2,12 @@ from qgis.core import QgsProject, QgsVectorLayer
 from typing import Generator, Tuple
 import os, csv
 
-from .gravity_model import GravityModel
+from ... import ILightModel
 from . import GM_LAYER_STAMP_FIELD_NAME
 
 
 class GravityModelDataManager:
-    def __init__(self, parent: GravityModel=None):
+    def __init__(self, parent: ILightModel=None):
         self.plugin_dir = parent.plugin_dir
         
         self._dir = self.create_dir()

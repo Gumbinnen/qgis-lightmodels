@@ -23,7 +23,8 @@
  This script initializes the plugin, making it known to QGIS.
 """
 
-from gui import QgisInterface
+
+from qgis.gui import QgisInterface
 
 # noinspection PyPep8Naming
 def classFactory(iface: QgisInterface):  # pylint: disable=invalid-name
@@ -35,3 +36,18 @@ def classFactory(iface: QgisInterface):  # pylint: disable=invalid-name
     #
     from .light_models import LightModels
     return LightModels(iface)
+
+
+from abc import ABC, abstractmethod
+
+class ILightModel(ABC):
+    
+    @property
+    @abstractmethod
+    def iface(self) -> QgisInterface:
+        pass
+    
+    @property
+    @abstractmethod
+    def plugin_dir(self) -> str:
+        pass

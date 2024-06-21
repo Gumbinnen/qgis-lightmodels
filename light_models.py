@@ -2,17 +2,18 @@ from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 from qgis.core import *
-from gui import QgisInterface
+from qgis.gui import QgisInterface
 import os.path
 
+from . import ILightModel
 from .resources import *
-from models.gravity_model.gravity_model import GravityModel
+from .models.gravity_model.gravity_model import GravityModel
 
 
-class LightModels:
+class LightModels(ILightModel):
     def __init__(self, iface: QgisInterface):
-        self.iface = iface
-        self.plugin_dir = os.path.dirname(__file__)
+        self._iface = iface
+        self._plugin_dir = os.path.dirname(__file__)
         
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]
@@ -37,6 +38,14 @@ class LightModels:
         self.gravity_model = None
         self.center_places_model = None
         self.regression_model = None
+        
+    @property
+    def iface(self):
+        return self._iface
+    
+    @property
+    def plugin_dir(self):
+        return self._plugin_dir
         
     # noinspection PyMethodMayBeStatic
     def tr(self, message):

@@ -58,7 +58,6 @@ def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.In
         prefix += sep
     QgsMessageLog.logMessage(title + prefix + message, tag=tab_name, level=level)
 
-
 def connect_once(call, action, *extra_args, **extra_kwargs) -> None: #: TODO: USE LAMBDA ONLY without *extra_args, **extra_kwargs?
     """Гарантирует единственное подключение одного сигнала или вызова функции к другому.
     
