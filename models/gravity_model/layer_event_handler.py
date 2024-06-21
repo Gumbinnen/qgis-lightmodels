@@ -21,10 +21,8 @@ class LayerEventHandler:
     def on_active_layer_changed(self):
         current_layer = self.iface.activeLayer()
         
-        # Проверка существования gm_data файла для этого слоя
-        is_gmlayer = self.data_manager.is_gmlayer(current_layer)
-        if not is_gmlayer:
-            self.log('Unexpected layer type.', level=Qgis.Warning)
+        # Проверка, создан ли слой классом GravityModel
+        if not self.data_manager.is_gm_layer(current_layer):
             return
         
         # Новый активный слой

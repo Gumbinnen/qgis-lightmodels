@@ -1,9 +1,9 @@
 from qgis.core import QgsProject, QgsVectorLayer
 from typing import Generator, Tuple
-from typing_extensions import deprecated
 import os, csv
 
 from .gravity_model import GravityModel
+from . import GM_LAYER_STAMP_FIELD_NAME
 
 
 class GravityModelDataManager:
@@ -117,9 +117,8 @@ class GravityModelDataManager:
                 return layer_ids[0]
         return None
 
-    @deprecated("Use is_gmlayer() instead")
-    def is_gmlayer(self, layer):
-        return False
+    def is_gm_layer(self, layer):
+        return GM_LAYER_STAMP_FIELD_NAME in [field.name() for field in layer.fields()]
 
     def read(self, data_path, contains_headers=False):
         if not self.dir_exists:

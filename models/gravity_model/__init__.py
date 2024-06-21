@@ -23,6 +23,7 @@ EXPORT_FILE_FORMAT = {
     'csv': 'csv'
 }
 
+GM_LAYER_STAMP_FIELD_NAME = 'LightModels_Gravity_Model_Layer'
 
 from qgis.core import QgsMessageLog, Qgis
 

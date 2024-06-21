@@ -11,7 +11,7 @@ from .config import GravityModelConfig as Config
 from .layer_event_handler import LayerEventHandler
 from .widget import GravityModelWidget
 from . import connect_once, log as log_function
-from . import EXPORT_FILE_FORMAT
+from . import EXPORT_FILE_FORMAT, GM_LAYER_STAMP_FIELD_NAME
 
 
 LINE_LAYER_NAME = 'линии [g. m.]'
@@ -46,7 +46,6 @@ class GravityModel(QObject):
     def connect_signals(self):
         connect_once(self.ui_widget.ready, self.go)
         connect_once(self.ui_widget.export, self.export)
-        
         connect_once(self.layer_event_handler.feature_selection, self.feature_selection)
 
     def export(self, data_path: str, save_path: str, desired_extension: str):
@@ -130,7 +129,7 @@ class GravityModel(QObject):
         # line_ids: list[str] = [line.id() for line in line_layer.getFeatures(request)]
         # line_layer.selectByIds(line_ids)
         
-    def go(self, input_data):        
+    def go(self, input_data):
         WEIGHT_FIELD_NAME = 'weight_[g.m.]'
         LAYER_GROUP_NAME = 'Гравитационная модель'
         
@@ -160,6 +159,7 @@ class GravityModel(QObject):
             
             point_layer_provider = point_layer.dataProvider()
             point_layer_provider.addAttributes(layer.fields())
+            point_layer_provider.addAttributes([QgsField(GM_LAYER_STAMP_FIELD_NAME, QVariant.Bool)])
             point_layer_provider.addFeatures(layer.getFeatures())
             point_layer.updateFields()
             return point_layer
@@ -169,7 +169,10 @@ class GravityModel(QObject):
             line_layer.setOpacity(0.5)
             
             line_layer_provider = line_layer.dataProvider()
-            line_layer_provider.addAttributes([QgsField('f_id', QVariant.Int), QgsField('tc_id', QVariant.Int)])
+            line_layer_provider.addAttributes([
+                QgsField(GM_LAYER_STAMP_FIELD_NAME, QVariant.Bool),
+                QgsField('f_id', QVariant.Int),
+                QgsField('tc_id', QVariant.Int)])
             line_layer.updateFields()
             return line_layer
         
