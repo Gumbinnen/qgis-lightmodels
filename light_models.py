@@ -119,7 +119,7 @@ class LightModels:
     
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-        icons_dir = os.path.join(self.plugin_dir, 'res', 'icons')
+        icons_dir = os.path.join(self.plugin_dir, 'resources', 'icons')
         self.add_action(
             icon_path=os.path.join(icons_dir, 'gravity_model_icon.png'),
             text=self.tr(u'Гравитационная модель'),

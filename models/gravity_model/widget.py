@@ -11,7 +11,7 @@ from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
 
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'res', 'ui', 'gravity_model_dockwidget.ui'))
+    os.path.dirname(__file__), 'resources', 'ui', 'gravity_model_dockwidget.ui'))
 
 LAYER_CMBOX_NAME = {
     'consumer':'consumer',
@@ -131,9 +131,10 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def export(self):
         desired_extension = self.cmbox_file_format
         if desired_extension in EXPORT_FILE_FORMAT:
-            save_path = QFileDialog.getSaveFileName(self,
-                                            'Выберите директорию для экспорта',
-                                            "", 'CSV (*.csv)')
+            save_path = QFileDialog.getSaveFileName(
+                self,
+                'Выберите директорию для экспорта',
+                "", 'CSV (*.csv)')
             
             layer_pair = self.cmbox_layer_pair
             [layer1_name, layer2_name] = layer_pair.split(' — ') # TODO: Переписать. Данные item'ов QLayerCombobox можно кастомизировать

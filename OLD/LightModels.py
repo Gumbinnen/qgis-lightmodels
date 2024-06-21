@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..resources import *
 from ..models.gravity_model.gravity_model import GravityModel
 from .OLD.my_plugin_dialog import MyPluginDialog
-from ..gravity_dialog import GravityDialog
+from .gravity_dialog import GravityDialog
 
 
 class LightModel:
@@ -491,26 +491,7 @@ class LightModel:
 
     def on_selection_changed(self):
         def log(*messages, note:str='', title:str='', tab:str=None, level=Qgis.Info, sep:str=' ') -> None:
-            """Custom log function for Qgis. Combine messages into letter and log.
-            
-            Example:
-                log(myValue, 'Status:', myStatus, note='MyValue:', tab='My Values')
-                
-                if isGood:
-                    log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Success)
-                else:
-                    log(isGood, note='isGood:', title='InspectorClass:', level=Qgis.Info)
-                    
-            Example output:
-                INFO MyValue: 200 Status: OK
-                SUCCESS InspectorClass: isGood: True
-
-            Args:
-                note (str, optional): note will appear before letter. Use for variable name when logging values. Defaults to ''.
-                title (str, optional): title will appear first. Use for global information. Defaults to ''.
-                tab (str, optional): If not None, QGIS will create separate log tab with given name. Defaults to ''.
-                level (Qgis.MessageLevel, optional): level of the message. Common levels: Info, Warning, Critical, Success. Defaults to Qgis.Info.
-                sep (str, optional): Default separate character. Defaults to ' '.
+            """Custom log function for Qgis. Combine messages into one message.
             """
             empty = ''
             letter = empty
@@ -560,7 +541,7 @@ class LightModel:
             
             # Здесь вероятности складываются, если ключи `labels` повторяются!
             #
-            # TODO: словарь должен быть относитеьно id точки, а не лейбла
+            #
             if label in my_dict:
                 my_dict[label] += float(value)
                 continue

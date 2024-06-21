@@ -14,7 +14,7 @@ class LayerEventHandler:
         self._previous_layer = None
         self.iface = parent.iface
         self.data_manager: DataManager = data_manager
-        self.log = partial(log_function, title=type(self).__name__, tab_name='Light Models')
+        self.log = partial(log_function, title=type(self).__name__, tab_name='LightModels')
         
         connect_once(self.iface.currentLayerChanged, self.on_active_layer_changed)
     

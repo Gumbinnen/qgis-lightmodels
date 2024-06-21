@@ -70,7 +70,7 @@ def connect_once(call, action, *extra_args, **extra_kwargs) -> None: #: TODO: US
     def wrapper(*args, **kwargs):
         action(*args, *extra_args, **kwargs, **extra_kwargs) #? TODO: What if I don't want action to receive args from call?
     
-    try:
+    try: # TODO: Probably too slow
         call.disconnect(wrapper) #? TODO: Replace wrapper with action?
     except AttributeError:
         # This is expected if the connection does not exist
