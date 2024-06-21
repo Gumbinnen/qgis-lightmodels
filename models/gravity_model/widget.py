@@ -85,8 +85,8 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def update_layer_pair_cmbox(self, index):   # TODO: Эта функция может быть умнее.
         self.cmbox_layer_pair.clear()           # Например, не очищать cmbox, если не изменился активный слой или содержимое папки data/
         if index == TAB_INDEX['export']:
-            for layer1_name, layer2_name in self.data_manager.get_all_layer_pair_names():
-                self.cmbox_layer_pair.addItem(' — '.join(layer1_name, layer2_name))
+            for layer1, layer2 in self.data_manager.get_all_layer_pairs():
+                self.cmbox_layer_pair.addItem(f'{layer1.name()}<br>{layer2.name()}', (layer1.id(), layer2.id()))
 
     def get_input(self):
         def get_field(layer, field_name):
@@ -129,21 +129,38 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.ready.emit(input_data)
 
     def export(self):
-        desired_extension = self.cmbox_file_format
-        if desired_extension in EXPORT_FILE_FORMAT:
-            save_path = QFileDialog.getSaveFileName(
-                self,
-                'Выберите директорию для экспорта',
-                "", 'CSV (*.csv)')
-            
-            layer_pair = self.cmbox_layer_pair
-            [layer1_name, layer2_name] = layer_pair.split(' — ') # TODO: Переписать. Данные item'ов QLayerCombobox можно кастомизировать
-            
-            data_path = … # TODO: Узазатель на выбранный файл для экспорта
-            
-            if save_path:
-                self.export.emit(data_path, save_path, desired_extension)
-                self.log("Экспорт файла...", Qgis.Success)
+        output_format = self.cmbox_file_format.currentText()
+        if output_format not in EXPORT_FILE_FORMAT:
+            self.log('Не удалось экспортировать файл. Выбранный формат не является допустимым', Qgis.Critical)
+            return
+        
+        layer1_id, layer2_id = self.cmbox_layer_pair.currentData()
+        
+        if not layer1_id or not layer2_id:
+                self.log('Не удалось экспортировать файл. Выбранный вариант не содержит данных.', Qgis.Critical)
+                return
+        
+        data_path = self.data_manager.get_data_path_if_exists(layer1_id, layer2_id)
+        
+        if not data_path:
+            self.log('Не удалось экспортировать файл. Файла не сущетсвует.', Qgis.Critical)
+            return
+        
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить файл как...", "",
+            f"{output_format} Файл (*.{output_format.lower()});;Все файлы (*)",
+            options=options)
+        
+        if not save_path:
+            self.log('Не удалось сохранить файл. Ошибка при выборе директории сохранения.')
+            return
+        
+        self.log("Экспорт файла...", Qgis.Info)
+        self.export.emit(data_path, save_path, output_format)
 
     # def d(self):
     #     var = 

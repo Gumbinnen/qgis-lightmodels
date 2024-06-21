@@ -48,17 +48,13 @@ class GravityModel(QObject):
         connect_once(self.ui_widget.export, self.export)
         connect_once(self.layer_event_handler.feature_selection, self.feature_selection)
 
-    def export(self, data_path: str, save_path: str, desired_extension: str):
-        if desired_extension not in EXPORT_FILE_FORMAT:
+    def export(self, data_path: str, save_path: str, output_format: str):
+        if output_format not in EXPORT_FILE_FORMAT:
             self.log('Export failed. Unexpected file format.', level=Qgis.Critical)
             return
         
-        # TODO:
-        # source = #??? source test ???
-        # destination = save_path #??? desired_extension ???
-        
         try:
-            # Копируем data_path —> save_path.  # (source) —> (destination)
+            # Копируем файл из data_path в save_path.
             shutil.copy(data_path, save_path)
         except Exception as e:
             self.log('File export failed with exception: ', str(e), level=Qgis.Critical)

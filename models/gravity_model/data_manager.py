@@ -41,18 +41,23 @@ class GravityModelDataManager:
     def file_exists(self, path) -> bool:
         return os.path.exists(path)
 
-    def get_all_layer_pair_names(self) -> Generator[Tuple[str, str], None, None]:
+    def get_all_layer_pairs(self) -> Generator[Tuple[QgsVectorLayer, QgsVectorLayer], None, None]:
         files = self._dir
         for file in files:
             layer1, layer2 = self.get_layer_pair_if_exists(file)
             if layer1 and layer2:
-                yield layer1.name, layer2.name
+                yield layer1, layer2
             
-    def get_data_path_if_exists(self, layer1, layer2):
-        file_name = f"{layer1.id()}&{layer2.id()}.csv"
-        data_path = os.path.join(self._dir, file_name)
-        if self.file_exists(data_path):
-            return data_path
+    def get_data_path_if_exists(self, layer1: QgsVectorLayer | str, layer2: QgsVectorLayer | str) -> str | None:
+        """layer1 and layer2 must be both type of QgsVectorLayer or QgsVectorLayer id (str)"""
+        if isinstance(layer1, QgsVectorLayer) and isinstance(layer2, QgsVectorLayer):
+            file_name = f"{layer1.id()}&{layer2.id()}.csv"
+        elif isinstance(layer1, str) and isinstance(layer2, str):
+            file_name = f"{layer1}&{layer2}.csv"
+        if file_name:
+            data_path = os.path.join(self._dir, file_name)
+            if self.file_exists(data_path):
+                return data_path
         return None
 
     def get_gravity_values(self, data_path):

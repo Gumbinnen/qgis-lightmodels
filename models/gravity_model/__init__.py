@@ -20,7 +20,9 @@ CONFIG_VALIDATION_ERROR_MESSAGE = {
 }
 
 EXPORT_FILE_FORMAT = {
-    'csv': 'csv'
+    'csv': 'csv',
+    'xls': 'xls',
+    'xlsx': 'xlsx'
 }
 
 GM_LAYER_STAMP_FIELD_NAME = 'LightModels_Gravity_Model_Layer'
