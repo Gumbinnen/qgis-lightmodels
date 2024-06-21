@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="analysis_tab">
      <attribute name="title">
@@ -67,7 +67,7 @@
        <item>
         <widget class="QComboBox" name="cmbox_consumer_attractiveness_field">
          <property name="enabled">
-          <bool>false</bool>
+          <number>12</number>
          </property>
          <property name="minimumSize">
           <size>
@@ -106,9 +106,6 @@
        </item>
        <item>
         <widget class="QComboBox" name="cmbox_site_attractiveness_field">
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
          <property name="minimumSize">
           <size>
            <width>0</width>

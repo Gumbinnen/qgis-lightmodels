@@ -27,12 +27,12 @@ TAB_INDEX = {
 
 class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
     ready = pyqtSignal(dict)
-    export = pyqtSignal(str, str, str)
+    export_request = pyqtSignal(str, str, str)
     diagram_field_selected = pyqtSignal(str)
     diagram_uid_field_selected = pyqtSignal(str)
     
     def __init__(self, data_manager: GravityModelDataManager=None):
-        super(GravityModelWidget, self).__init__()
+        super().__init__()
         self.data_manager = data_manager
         self.log = partial(log_function, title=type(self).__name__, tab_name='LightModels')
         
@@ -51,8 +51,8 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
             lambda: self.update_field_cmbox(LAYER_CMBOX_NAME['site']))
         
         # Фильтрация слоёв в cmbox
-        self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer | QgsMapLayerProxyModel.Visible)
-        self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer | QgsMapLayerProxyModel.Visible)
+        self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
+        self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
         
         self.cmbox_field.currentTextChanged.connect(
             lambda field_name: self.diagram_field_selected.emit(field_name))
@@ -84,9 +84,22 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def update_layer_pair_cmbox(self, index):   # TODO: Эта функция может быть умнее.
         self.cmbox_layer_pair.clear()           # Например, не очищать cmbox, если не изменился активный слой или содержимое папки data/
-        if index == TAB_INDEX['export']:
-            for layer1, layer2 in self.data_manager.get_all_layer_pairs():
+        if index != TAB_INDEX['export']:
+            return
+        
+        # TODO: Uneficient. Check for pairs once and return if not exist
+        layer_pair = self.data_manager.get_all_layer_pairs()
+        
+        if not layer_pair:
+            return
+        
+        try:
+            for layer1, layer2 in layer_pair:
+                if not layer1 or not layer2:
+                    continue
                 self.cmbox_layer_pair.addItem(f'{layer1.name()}<br>{layer2.name()}', (layer1.id(), layer2.id()))
+        except StopIteration:
+            return
 
     def get_input(self):
         def get_field(layer, field_name):
@@ -160,4 +173,4 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
             return
         
         self.log("Экспорт файла...", Qgis.Info)
-        self.export.emit(data_path, save_path, output_format)
+        self.export_request.emit(data_path, save_path, output_format)

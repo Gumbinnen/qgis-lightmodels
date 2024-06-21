@@ -79,7 +79,7 @@ def connect_once(call, action, *extra_args, **extra_kwargs) -> None: #: TODO: US
     
     try: # TODO: Probably too slow
         call.disconnect(wrapper) #? TODO: Replace wrapper with action?
-    except AttributeError:
+    except (TypeError, AttributeError):
         # This is expected if the connection does not exist
         pass
     call.connect(wrapper)
@@ -88,6 +88,6 @@ def disconnect_safe(call, action) -> None:
     """Гарантирует отключение одного сигнала или вызова функции от другого без возникновения исключений."""
     try:
         call.disconnect(action)
-    except AttributeError:
+    except (TypeError, AttributeError):
         # This is expected if the connection does not exist
         pass

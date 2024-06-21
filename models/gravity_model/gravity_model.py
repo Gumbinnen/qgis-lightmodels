@@ -19,7 +19,7 @@ LINE_LAYER_NAME = 'линии [g. m.]'
 
 class GravityModel(QObject):
     def __init__(self, parent: ILightModel=None):
-        super(GravityModel, self).__init__()
+        super().__init__()
         self.iface = parent.iface
         self.plugin_dir = parent.plugin_dir
         
@@ -45,7 +45,7 @@ class GravityModel(QObject):
         
     def connect_signals(self):
         connect_once(self.ui_widget.ready, self.go)
-        connect_once(self.ui_widget.export, self.export)
+        connect_once(self.ui_widget.export_request, self.export)
         connect_once(self.layer_event_handler.feature_selection, self.feature_selection)
 
     def export(self, data_path: str, save_path: str, output_format: str):

@@ -1,4 +1,4 @@
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from functools import partial
 
 from ... import ILightModel
@@ -6,10 +6,11 @@ from .data_manager import GravityModelDataManager as DataManager
 from . import connect_once, disconnect_safe, log as log_function
 
 
-class LayerEventHandler:
+class LayerEventHandler(QObject):
     feature_selection = pyqtSignal(list)
     
     def __init__(self, parent: ILightModel=None, data_manager: DataManager=None):
+        super().__init__()
         self._previous_layer = None
         self.iface = parent.iface
         self.data_manager: DataManager = data_manager
