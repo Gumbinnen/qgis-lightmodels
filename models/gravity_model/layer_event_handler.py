@@ -7,7 +7,7 @@ from . import connect_once, disconnect_safe, log as log_function
 
 
 class LayerEventHandler:
-    feature_selection = pyqtSignal(list[int])
+    feature_selection = pyqtSignal(list)
     
     def __init__(self, parent: ILightModel=None, data_manager: DataManager=None):
         self._previous_layer = None

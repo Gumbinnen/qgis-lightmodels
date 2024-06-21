@@ -3,15 +3,15 @@ from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.PyQt import QtWidgets, uic
 from qgis.core import QgsMapLayerProxyModel, Qgis
 from functools import partial
-import os
+import os.path
 
 from .data_manager import GravityModelDataManager
 from . import log as log_function
-from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT
+from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT, PLUGIN_DIR
 
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'resources', 'ui', 'gravity_model_dockwidget.ui'))
+    PLUGIN_DIR, 'resources', 'ui', 'gravity_model_dockwidget.ui'))
 
 LAYER_CMBOX_NAME = {
     'consumer':'consumer',
@@ -161,8 +161,3 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         self.log("Экспорт файла...", Qgis.Info)
         self.export.emit(data_path, save_path, output_format)
-
-    # def d(self):
-    #     var = 
-    #     self.cmbox_uid_field
-    #     self.cmbox_field

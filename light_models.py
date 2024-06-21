@@ -142,7 +142,7 @@ class LightModels(ILightModel):
         self.add_action(
             icon_path=os.path.join(icons_dir, 'regression_model_icon.png'),
             text=self.tr(u'Регрессионная модель'),
-            callback=self.run_cregression_model,
+            callback=self.run_regression_model,
             parent=self.iface.mainWindow())
         
     def unload(self):

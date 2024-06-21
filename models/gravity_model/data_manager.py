@@ -1,5 +1,5 @@
 from qgis.core import QgsProject, QgsVectorLayer
-from typing import Generator, Tuple
+from typing import Generator, Tuple, Union
 import os, csv
 
 from ... import ILightModel
@@ -48,7 +48,7 @@ class GravityModelDataManager:
             if layer1 and layer2:
                 yield layer1, layer2
             
-    def get_data_path_if_exists(self, layer1: QgsVectorLayer | str, layer2: QgsVectorLayer | str) -> str | None:
+    def get_data_path_if_exists(self, layer1: Union[QgsVectorLayer, str], layer2: Union[QgsVectorLayer, str]) -> Union[str, None]:
         """layer1 and layer2 must be both type of QgsVectorLayer or QgsVectorLayer id (str)"""
         if isinstance(layer1, QgsVectorLayer) and isinstance(layer2, QgsVectorLayer):
             file_name = f"{layer1.id()}&{layer2.id()}.csv"
@@ -101,7 +101,7 @@ class GravityModelDataManager:
         layer2 = QgsProject.instance().mapLayer(layer2_id)
         return layer1, layer2
     
-    def get_second_layer(self, first_layer_id: QgsVectorLayer | str) -> QgsVectorLayer | None:
+    def get_second_layer(self, first_layer_id: Union[QgsVectorLayer, str]) -> Union[QgsVectorLayer, None]:
         if isinstance(first_layer_id, QgsVectorLayer):
             first_layer_id = first_layer_id.id()
         if isinstance(first_layer_id, str):
@@ -109,7 +109,7 @@ class GravityModelDataManager:
             layer = QgsProject.instance().mapLayer(layer_id)
             return layer
     
-    def get_second_layer_id(self, first_layer_id: str) -> str | None:
+    def get_second_layer_id(self, first_layer_id: str) -> Union[str, None]:
         files = self._dir
         for file in files:
             file_name = os.path.basename(file)

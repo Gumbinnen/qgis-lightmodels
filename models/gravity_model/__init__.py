@@ -1,3 +1,7 @@
+import os.path
+
+PLUGIN_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
+
 GRAVITY_MODEL_VAR_NAME = {
     'LAYER_CONSUMER': 0,
     'LAYER_SITE': 1,
@@ -26,6 +30,7 @@ EXPORT_FILE_FORMAT = {
 }
 
 GM_LAYER_STAMP_FIELD_NAME = 'LightModels_Gravity_Model_Layer'
+
 
 from qgis.core import QgsMessageLog, Qgis
 
