@@ -13,7 +13,7 @@ from . import GRAVITY_MODEL_VAR_NAME as VAR, EXPORT_FILE_FORMAT, PLUGIN_DIR
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     PLUGIN_DIR, 'resources', 'ui', 'gravity_model_dockwidget.ui'))
 
-LAYER_CMBOX_NAME = {
+LAYER_CMBOX_NAME = CMBOX_NAME = {
     'consumer':'consumer',
     'site':'site',
 }
@@ -40,19 +40,19 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.init_ui()
 
     def init_ui(self):
-        # Инициализация cmbox с допустимыми форматами файлов для экспорта
-        self.cmbox_file_format.addItems(EXPORT_FILE_FORMAT.values())
+        # Фильтрация слоёв при добавлении в cmbox
+        self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
+        self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
         
         # Обновление field_cmbox при выборе слоя
         self.cmbox_consumer_layer.currentIndexChanged.connect(
-            lambda: self.update_field_cmbox(LAYER_CMBOX_NAME['consumer']))
+            lambda: self.update_field_cmbox(CMBOX_NAME['consumer']))
         
         self.cmbox_site_layer.currentIndexChanged.connect(
-            lambda: self.update_field_cmbox(LAYER_CMBOX_NAME['site']))
+            lambda: self.update_field_cmbox(CMBOX_NAME['site']))
         
-        # Фильтрация слоёв в cmbox
-        self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
-        self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
+        # Инициализация cmbox с допустимыми форматами файлов для экспорта
+        self.cmbox_file_format.addItems(EXPORT_FILE_FORMAT.values())
         
         self.cmbox_field.currentTextChanged.connect(
             lambda field_name: self.diagram_field_selected.emit(field_name))
@@ -63,24 +63,39 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         self.tab_widget.currentChanged.connect(self.update_layer_pair_cmbox)
         
+        # Инициализация field cmbox с выбранными слоями
+        self.update_field_cmbox(CMBOX_NAME['consumer'])
+        self.update_field_cmbox(CMBOX_NAME['site'])
+        
     def update_field_cmbox(self, layer_cmbox_name: str):
+        # Get cmbox_layer and cmbox_field by layer_cmbox_name
         cmbox_layer, cmbox_field = {
-            layer_cmbox_name == LAYER_CMBOX_NAME['consumer']: (self.cmbox_consumer_layer, self.cmbox_consumer_attractiveness_field),
-            layer_cmbox_name == LAYER_CMBOX_NAME['site']: (self.cmbox_site_layer, self.cmbox_site_attractiveness_field)
+            layer_cmbox_name == CMBOX_NAME['consumer']: (self.cmbox_consumer_layer, self.cmbox_consumer_attractiveness_field),
+            layer_cmbox_name == CMBOX_NAME['site']: (self.cmbox_site_layer, self.cmbox_site_attractiveness_field)
         }[True]
         
-        cmbox_field.setEnabled(True)
-        
-        # if choice_index == -1:
-        #     cmbox_field.clear()
-        #     cmbox_field.setEnabled(False)
-        #     return
-        
+        if cmbox_layer is None or cmbox_field is None:
+            self.log('Error: One of the combo boxes is None', level=Qgis.Warning)
+            return
+
+        if cmbox_layer.count() == 0:
+            self.log('Error: Layer combo box is empty', level=Qgis.Warning)
+            return
+
+        # Если cmbox_layer пустой, выключить cmbox_field
+        if cmbox_layer.count() <= 0:
+            cmbox_field.setEnabled(False)
+            cmbox_field.setCurrentIndex(-1)
+            return
+
+        # Добавить поля слоя в field_cmbox
         layer_fields = cmbox_layer.currentLayer().dataProvider().fields()
         field_names = [field.name() for field in layer_fields]
         
         cmbox_field.clear()
         cmbox_field.addItems(field_names)
+        cmbox_field.setEnabled(True)
+        cmbox_field.setCurrentIndex(0)
 
     def update_layer_pair_cmbox(self, index):   # TODO: Эта функция может быть умнее.
         self.cmbox_layer_pair.clear()           # Например, не очищать cmbox, если не изменился активный слой или содержимое папки data/
@@ -112,10 +127,10 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         layer_consumer = self.cmbox_consumer_layer.currentLayer()
         layer_site = self.cmbox_site_layer.currentLayer()
         
-        consumer_field_name = self.cmbox_consumer_attractiveness_field
+        consumer_field_name = self.cmbox_consumer_attractiveness_field.currentText()
         field_consumer = get_field(layer_consumer, consumer_field_name)
         
-        site_field_name = self.cmbox_site_attractiveness_field
+        site_field_name = self.cmbox_site_attractiveness_field.currentText()
         field_site = get_field(layer_site, site_field_name)
         
         alpha = float(self.spbox_alpha.value())

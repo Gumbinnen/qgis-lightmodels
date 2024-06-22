@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>DockWidget</string>
+   <string>Гравитационная модель</string>
   </property>
   <widget class="QWidget" name="dock_widget_contents">
    <widget class="QTabWidget" name="tab_widget">
@@ -67,7 +67,7 @@
        <item>
         <widget class="QComboBox" name="cmbox_consumer_attractiveness_field">
          <property name="enabled">
-          <number>12</number>
+          <bool>false</bool>
          </property>
          <property name="minimumSize">
           <size>
@@ -77,6 +77,12 @@
          </property>
          <property name="contextMenuPolicy">
           <enum>Qt::NoContextMenu</enum>
+         </property>
+         <property name="currentIndex">
+          <number>-1</number>
+         </property>
+         <property name="maxVisibleItems">
+          <number>12</number>
          </property>
          <property name="placeholderText">
           <string>Атрибут значимости потребителей</string>
@@ -92,6 +98,9 @@
        </item>
        <item>
         <widget class="QgsMapLayerComboBox" name="cmbox_site_layer">
+         <property name="maxVisibleItems">
+          <number>12</number>
+         </property>
          <property name="placeholderText">
           <string>Слой поставщиков</string>
          </property>
@@ -106,6 +115,9 @@
        </item>
        <item>
         <widget class="QComboBox" name="cmbox_site_attractiveness_field">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
          <property name="minimumSize">
           <size>
            <width>0</width>
@@ -114,6 +126,9 @@
          </property>
          <property name="contextMenuPolicy">
           <enum>Qt::NoContextMenu</enum>
+         </property>
+         <property name="maxVisibleItems">
+          <number>12</number>
          </property>
          <property name="placeholderText">
           <string>Атрибут значимости поставщиков</string>
@@ -214,85 +229,59 @@
       </property>
       <layout class="QVBoxLayout" name="diagram_layout"/>
      </widget>
-     <widget class="QWidget" name="verticalLayoutWidget_4">
+     <widget class="QLabel" name="label_diagram_fields">
       <property name="geometry">
        <rect>
-        <x>0</x>
-        <y>310</y>
-        <width>381</width>
-        <height>71</height>
+        <x>1</x>
+        <y>311</y>
+        <width>109</width>
+        <height>16</height>
        </rect>
       </property>
-      <layout class="QVBoxLayout" name="diagram_settings_vertical_layout">
-       <item>
-        <widget class="QLabel" name="label_diagram_fields">
-         <property name="maximumSize">
-          <size>
-           <width>567</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Подписи к диаграмме</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="diagram_fields_horizontal_layout">
-         <item>
-          <layout class="QVBoxLayout" name="diagram_uid_field_vertical_layout">
-           <item>
-            <widget class="QLabel" name="label_uid_field">
-             <property name="text">
-              <string>Поле с уникльным ID поставщиков</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QComboBox" name="cmbox_uid_field">
-             <property name="maximumSize">
-              <size>
-               <width>366</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="placeholderText">
-              <string>ID поставщиков</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item>
-          <layout class="QVBoxLayout" name="diagram_field_vertical_layout">
-           <item>
-            <widget class="QLabel" name="label_field">
-             <property name="text">
-              <string>Выберите поле поставщиков</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QComboBox" name="cmbox_field">
-             <property name="maximumSize">
-              <size>
-               <width>3466</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="placeholderText">
-              <string>Поле поставщиков</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-        </layout>
-       </item>
-      </layout>
+      <property name="maximumSize">
+       <size>
+        <width>567</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Подписи к диаграмме</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_field">
+      <property name="geometry">
+       <rect>
+        <x>3</x>
+        <y>339</y>
+        <width>148</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Выберите поле поставщиков</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="cmbox_field">
+      <property name="geometry">
+       <rect>
+        <x>3</x>
+        <y>358</y>
+        <width>181</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>3466</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="placeholderText">
+       <string>Поле поставщиков</string>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="export_tab">
