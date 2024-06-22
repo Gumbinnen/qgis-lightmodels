@@ -46,7 +46,7 @@ class GravityModelConfig:
     
     @property
     def all_params(self) -> tuple[QgsVectorLayer, QgsVectorLayer, QgsField, QgsField, float, float, int]:
-        return self.all_layers(), self.all_fields(), self.all_numeric_params()
+        return *self.all_layers, *self.all_fields, *self.all_numeric_params
     
     @property
     def all_layers(self) -> tuple[QgsVectorLayer, QgsVectorLayer]:
