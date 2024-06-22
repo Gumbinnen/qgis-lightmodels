@@ -58,7 +58,7 @@ def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.In
     """
     message = sep.join(map(str, messages))
     if title:
-        title += sep
+        title = f'[ {title} ]' + sep
     if prefix:
         prefix += sep
     QgsMessageLog.logMessage(title + prefix + message, tag=tab_name, level=level)
