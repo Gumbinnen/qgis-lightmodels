@@ -202,14 +202,13 @@ class GravityModel(QObject):
             for error in self.config.errors:
                 self.log('Config Validation Error: ', error, level=Qgis.Critical)
             return
-
         # Инстанс проекта
         project = QgsProject.instance()
 
         # Получение переменных из self.config
         (layer, layer_tc,
         layer_attr, layer_attr_tc,
-        alpha, beta, max_distance) = self.config.all_params()
+        alpha, beta, max_distance) = self.config.all_params
         
         # Создаем точечный слой поставщиков
         layer_tc = create_point_layer(layer_tc)
@@ -269,7 +268,8 @@ class GravityModel(QObject):
                     huff_numerators.append(0)
                     continue
                 
-                huff_numerators.append(huff_numerator(tc[layer_attr_tc], distance_meters, alpha, beta))
+                tc_attractiveness = tc[layer_attr_tc.name()]
+                huff_numerators.append(huff_numerator(tc_attractiveness, distance_meters, alpha, beta))
 
                 # Добавляем линии в line_layer
                 line_feature = create_line_feature(f_point, tc_point, [f.id(), tc.id()])
