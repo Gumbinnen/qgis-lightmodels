@@ -1,4 +1,4 @@
-from qgis.core import QgsVectorLayer, QgsField, Qgis
+from qgis.core import QgsVectorLayer, QgsField
 from functools import partial
 from . import log as log_function
 from . import GRAVITY_MODEL_VAR_NAME as VAR, CONFIG_VALIDATION_ERROR_MESSAGE as ERR_MSG
@@ -78,9 +78,8 @@ class GravityModelConfig:
         is_valid = True
         def report(message):
             self._errors.append(message)
-            self.log(message, note='VALIDATION ERROR:', level=Qgis.Critical)
         
-        # Очистка прошлых ошибок
+        # Очистка предыдущих ошибок
         #
         self._errors.clear()
         
