@@ -1,7 +1,7 @@
 from PyQt5.QtCore import pyqtSignal
 from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.PyQt import QtWidgets, uic
-from qgis.core import QgsMapLayerProxyModel, Qgis
+from qgis.core import QgsMapLayerProxyModel, Qgis, QgsProject
 from functools import partial
 import os.path
 
@@ -40,9 +40,18 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.init_ui()
 
     def init_ui(self):
+        def connect_visibility_changed(node):
+            node.visibilityChanged.connect(self.update_excluded_layers)
+            for child in node.children():
+                connect_visibility_changed(child)
+            
         # Фильтрация слоёв при добавлении в cmbox
         self.cmbox_consumer_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
         self.cmbox_site_layer.setFilters(QgsMapLayerProxyModel.VectorLayer)
+        
+        # Подключение сигнала visibilityChanged к update_excluded_layers() ко всем слоям дерева слоёв
+        root_node = QgsProject.instance().layerTreeRoot()
+        connect_visibility_changed(root_node)
         
         # Обновление field_cmbox при выборе слоя
         self.cmbox_consumer_layer.currentIndexChanged.connect(
@@ -67,6 +76,18 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.update_field_cmbox(CMBOX_NAME['consumer'])
         self.update_field_cmbox(CMBOX_NAME['site'])
         
+    def update_excluded_layers(self):
+        excluded_layers = []
+        layers = QgsProject.instance().mapLayers().values()
+        root = QgsProject.instance().layerTreeRoot()
+        for layer in layers:
+            node = root.findLayer(layer.id())
+            if node and not node.isVisible():
+                excluded_layers.append(layer)
+
+        self.cmbox_consumer_layer.setExceptedLayerList(excluded_layers)
+        self.cmbox_site_layer.setExceptedLayerList(excluded_layers)
+        
     def update_field_cmbox(self, layer_cmbox_name: str):
         # Get cmbox_layer and cmbox_field by layer_cmbox_name
         cmbox_layer, cmbox_field = {
@@ -78,16 +99,12 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.log('Error: One of the combo boxes is None', level=Qgis.Warning)
             return
 
-        if cmbox_layer.count() == 0:
-            self.log('Error: Layer combo box is empty', level=Qgis.Warning)
-            return
-
         # Если cmbox_layer пустой, выключить cmbox_field
         if cmbox_layer.count() <= 0:
             cmbox_field.setEnabled(False)
             cmbox_field.setCurrentIndex(-1)
             return
-
+        
         # Добавить поля слоя в field_cmbox
         layer_fields = cmbox_layer.currentLayer().dataProvider().fields()
         field_names = [field.name() for field in layer_fields]
@@ -115,7 +132,7 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 self.cmbox_layer_pair.addItem(f'{layer1.name()}<br>{layer2.name()}', (layer1.id(), layer2.id()))
         except StopIteration:
             return
-
+    
     def get_input(self):
         def get_field(layer, field_name):
             fields = layer.fields()
@@ -134,8 +151,8 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         field_site = get_field(layer_site, site_field_name)
         
         alpha = float(self.spbox_alpha.value())
-        beta = float(self.spbox_alpha.value())
-        distance_limit_meters = int(self.spbox_alpha.value())
+        beta = float(self.spbox_beta.value())
+        distance_limit_meters = int(self.spbox_distance_limit_meters.value())
         
         return layer_consumer, layer_site, field_consumer, field_site, alpha, beta, distance_limit_meters
 
