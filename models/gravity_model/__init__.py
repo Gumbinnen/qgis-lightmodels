@@ -63,26 +63,22 @@ def log(*messages, prefix:str='', title:str='', tab_name:str=None, level=Qgis.In
         prefix += sep
     QgsMessageLog.logMessage(title + prefix + message, tag=tab_name, level=level)
 
-def connect_once(call, action, *extra_args, **extra_kwargs) -> None: #: TODO: USE LAMBDA ONLY without *extra_args, **extra_kwargs?
+def connect_once(call, action) -> None:
     """Гарантирует единственное подключение одного сигнала или вызова функции к другому.
     
-
     pyqtSignal —> Callable
     
     Callable —> pyqtSignal
     
     etc.
     """
-    # Wrapper function that will pass the signal arguments along with extra_args and extra_kwargs
-    def wrapper(*args, **kwargs):
-        action(*args, *extra_args, **kwargs, **extra_kwargs) #? TODO: What if I don't want action to receive args from call?
     
-    try: # TODO: Probably too slow
-        call.disconnect(wrapper) #? TODO: Replace wrapper with action?
+    try:
+        call.disconnect(action)
     except (TypeError, AttributeError):
         # This is expected if the connection does not exist
         pass
-    call.connect(wrapper)
+    call.connect(action)
 
 def disconnect_safe(call, action) -> None:
     """Гарантирует отключение одного сигнала или вызова функции от другого без возникновения исключений."""
