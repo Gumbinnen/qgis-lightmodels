@@ -1,10 +1,11 @@
 from qgis.core import QgsProject, QgsVectorLayer
-from typing import Generator, Tuple, Union
+from typing import Tuple, Union
 import os, csv
 
 from ... import ILightModel
 from . import GM_LAYER_STAMP_FIELD_NAME
 
+SEPARATOR = '~'
 
 class GravityModelDataManager:
     def __init__(self, parent: ILightModel=None):
@@ -24,9 +25,12 @@ class GravityModelDataManager:
         return path
     
     def create_file(self, layer1, layer2):
-        name = f'{layer1.id()}&{layer2.id()}.csv'
+        name = self.create_name(layer1.id(), layer2.id())
         data_path = os.path.join(self._dir, name)
         return data_path
+    
+    def create_name(self, layer1_id: str, layer2_id: str) -> str:
+        return f'{layer1_id.replace(SEPARATOR, "")}{SEPARATOR}{layer2_id.replace(SEPARATOR, "")}.csv'
     
     def delete_all_files(self):
         if not self.dir_exists:
@@ -42,20 +46,22 @@ class GravityModelDataManager:
     def file_exists(self, path) -> bool:
         return os.path.exists(path)
 
-    def get_all_layer_pairs(self) -> Generator[Tuple[QgsVectorLayer, QgsVectorLayer], None, None]:
+    def get_all_layer_pairs(self) -> Tuple[QgsVectorLayer, QgsVectorLayer]:
+        layer_pairs = []
         files = os.listdir(self._dir)
         for file in files:
             data_path = os.path.join(self._dir, file)
             layer_pair = self.get_layer_pair_if_exists(data_path)
             if layer_pair:
-                yield layer_pair
+                layer_pairs.append(layer_pair)
+        return tuple(layer_pairs)
     
     def get_data_path_if_exists(self, layer1: Union[QgsVectorLayer, str], layer2: Union[QgsVectorLayer, str]) -> Union[str, None]:
         """layer1 and layer2 must be both type of QgsVectorLayer or QgsVectorLayer id (str)"""
         if isinstance(layer1, QgsVectorLayer) and isinstance(layer2, QgsVectorLayer):
-            file_name = f"{layer1.id()}&{layer2.id()}.csv"
+            file_name = self.create_name(layer1.id(), layer2.id())
         elif isinstance(layer1, str) and isinstance(layer2, str):
-            file_name = f"{layer1}&{layer2}.csv"
+            file_name = self.create_name(layer1, layer2)
         if file_name:
             data_path = os.path.join(self._dir, file_name)
             if self.file_exists(data_path):
@@ -91,7 +97,7 @@ class GravityModelDataManager:
 
     def get_layer_pair_ids(self, data_path):
         file_name = os.path.basename(data_path)
-        layer1_id, layer2_id = tuple(file_name.split('&'))
+        layer1_id, layer2_id = tuple(file_name.split(SEPARATOR))
         return layer1_id, layer2_id[:-4] # TODO: erase ".csv" other way around?
     
     def get_layer_pair_if_exists(self, data_path):
@@ -115,7 +121,8 @@ class GravityModelDataManager:
         files = self._dir
         for file in files:
             file_name = os.path.basename(file)
-            layer_ids = file_name.split('&')
+            layer_ids = file_name.split(SEPARATOR)
+            
             layer_ids[1] = layer_ids[1].replace('.csv', '')
             
             if str(first_layer_id) in layer_ids[0]:

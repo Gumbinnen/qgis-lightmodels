@@ -41,7 +41,7 @@ class GravityModel(QObject):
         self.data_manager = DataManager(parent=self)
         self.ui_widget = GravityModelWidget(data_manager=self.data_manager)
         self.diagram_manager = DiagramManager(ui_widget=self.ui_widget)
-        self.layer_event_handler = LayerEventHandler(parent=self, data_manager=self.data_manager)
+        self.layer_event_handler = LayerEventHandler(parent=self, data_manager=self.data_manager, ui_widget=self.ui_widget)
         
     def connect_signals(self):
         connect_once(self.ui_widget.ready, lambda *data: self.go(*data))
@@ -80,7 +80,7 @@ class GravityModel(QObject):
         if not data_path:
             return
         
-        def is_id_field(field):
+        def is_id_field(field: QgsField) -> bool:
             return field == 'id'
         
         # # #       f_probability_values

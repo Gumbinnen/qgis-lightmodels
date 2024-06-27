@@ -70,8 +70,6 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         self.btn_export.clicked.connect(self.export)
         
-        self.tab_widget.currentChanged.connect(self.update_layer_pair_cmbox)
-        
         # Инициализация field cmbox с выбранными слоями
         self.update_field_cmbox(CMBOX_NAME['consumer'])
         self.update_field_cmbox(CMBOX_NAME['site'])
@@ -114,24 +112,21 @@ class GravityModelWidget(QtWidgets.QDockWidget, FORM_CLASS):
         cmbox_field.setEnabled(True)
         cmbox_field.setCurrentIndex(0)
 
-    def update_layer_pair_cmbox(self, index):   # TODO: Эта функция может быть умнее.
-        self.cmbox_layer_pair.clear()           # Например, не очищать cmbox, если не изменился активный слой или содержимое папки data/
-        if index != TAB_INDEX['export']:
+    def update_layer_pair_cmbox(self):   # TODO: Эта функция может быть умнее.
+        if self.tab_widget.currentIndex() != TAB_INDEX['export']:
             return
         
-        # TODO: Uneficient. Check for pairs once and return if not exist
+        self.cmbox_layer_pair.clear()
+        
         layer_pair = self.data_manager.get_all_layer_pairs()
         
         if not layer_pair:
             return
         
-        try:
-            for layer1, layer2 in layer_pair:
-                if not layer1 or not layer2:
-                    continue
-                self.cmbox_layer_pair.addItem(f'{layer1.name()}<br>{layer2.name()}', (layer1.id(), layer2.id()))
-        except StopIteration:
-            return
+        for layer1, layer2 in layer_pair:
+            if not layer1 or not layer2:
+                continue
+            self.cmbox_layer_pair.addItem(f'{layer1.name()} —— {layer2.name()}', (layer1.id(), layer2.id()))
     
     def get_input(self):
         def get_field(layer, field_name):
